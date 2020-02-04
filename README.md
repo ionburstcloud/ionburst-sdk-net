@@ -1,4 +1,4 @@
-# Ionburst SDK for .NET
+# Ionburst SDK for .NET [![Gitter](https://badges.gitter.im/ionburstlimited/community.svg)](https://gitter.im/ionburstlimited/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 The **Ionburst SDK for .NET** enables .NET developers to easily work with [Ionburst][ionburst] and build ultra-secure and private storage into their applications.
 
