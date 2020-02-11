@@ -7,7 +7,11 @@
     <Company>Ionburst Limited</Company>
     <Product>Ionburst</Product>
     <Description>.NET SDK for Ionburst API</Description>
-    <Copyright>Ionburst Limited 2019</Copyright>
+    <Copyright>Ionburst Limited 2020</Copyright>
+    <Title>Ionburst SDK</Title>
+    <PackageProjectUrl>https://gitlab.com/ionburst/ionburst-sdk-net</PackageProjectUrl>
+    <PackageLicenseUrl>https://gitlab.com/ionburst/ionburst-sdk-net/-/blob/master/LICENSE</PackageLicenseUrl>
+    <RepositoryUrl>https://gitlab.com/ionburst/ionburst-sdk-net</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
