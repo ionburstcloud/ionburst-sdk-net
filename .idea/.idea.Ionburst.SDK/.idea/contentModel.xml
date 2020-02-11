@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ContentModelStore">
+    <e p="$USER_HOME$/.Rider2019.2/system/extResources" t="IncludeRecursive" />
+    <e p="$USER_HOME$/.Rider2019.2/system/resharper-host/local/Transient/ReSharperHost/v192/SolutionCaches/_Ionburst.SDK.1656802829.00" t="ExcludeRecursive" />
+    <e p="$PROJECT_DIR$" t="IncludeFlat">
+      <e p=".gitlab-ci.yml" t="Include" />
+      <e p="Ionburst.SDK" t="IncludeRecursive">
+        <e p="ApiHandler.cs" t="Include" />
+        <e p="AuthorisationBody.cs" t="Include" />
+        <e p="AuthorisationResponse.cs" t="Include" />
+        <e p="IIonburstClient.cs" t="Include" />
+        <e p="Ionburst.SDK.csproj" t="IncludeRecursive" />
+        <e p="IonburstClient.cs" t="Include" />
+        <e p="IonburstClientFactory.cs" t="Include" />
+        <e p="IonburstSDKSettings.cs" t="Include" />
+        <e p="JwtRequest.cs" t="Include" />
+        <e p="JwtResponse.cs" t="Include" />
+        <e p="bin" t="ExcludeRecursive" />
+        <e p="obj" t="ExcludeRecursive">
+          <e p="Debug" t="Include">
+            <e p="netstandard2.1" t="Include">
+              <e p="Ionburst.SDK.AssemblyInfo.cs" t="Include" />
+            </e>
+          </e>
+        </e>
+      </e>
+      <e p="Ionburst.SDK.sln" t="IncludeFlat" />
+      <e p="Solution Items" t="Include" />
+      <e p="packages" t="ExcludeRecursive" />
+    </e>
+  </component>
+</project>

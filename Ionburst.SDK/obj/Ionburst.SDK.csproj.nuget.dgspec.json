@@ -1,0 +1,94 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/josh/projects/ionburst/sdk/ionburst-sdk-net/Ionburst.SDK/Ionburst.SDK.csproj": {}
+  },
+  "projects": {
+    "/home/josh/projects/ionburst/sdk/ionburst-sdk-net/Ionburst.SDK/Ionburst.SDK.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/josh/projects/ionburst/sdk/ionburst-sdk-net/Ionburst.SDK/Ionburst.SDK.csproj",
+        "projectName": "Ionburst.SDK",
+        "projectPath": "/home/josh/projects/ionburst/sdk/ionburst-sdk-net/Ionburst.SDK/Ionburst.SDK.csproj",
+        "packagesPath": "/home/josh/.nuget/packages/",
+        "outputPath": "/home/josh/projects/ionburst/sdk/ionburst-sdk-net/Ionburst.SDK/obj/",
+        "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "/usr/share/dotnet/sdk/NuGetFallbackFolder"
+        ],
+        "configFilePaths": [
+          "/home/josh/.config/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netstandard2.1"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {},
+          "https://artifact.cyborn.co.uk/repository/nuget-hosted/": {}
+        },
+        "frameworks": {
+          "netstandard2.1": {
+            "projectReferences": {
+              "/home/josh/projects/ionburst/sdk/ionburst-sdk-net/Ionburst.SDK.Model/Ionburst.SDK.Model.csproj": {
+                "projectPath": "/home/josh/projects/ionburst/sdk/ionburst-sdk-net/Ionburst.SDK.Model/Ionburst.SDK.Model.csproj"
+              }
+            }
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        }
+      },
+      "frameworks": {
+        "netstandard2.1": {
+          "dependencies": {
+            "Ionburst.Api.Model": {
+              "target": "Package",
+              "version": "[1.0.7300, )"
+            },
+            "Microsoft.Extensions.Configuration.EnvironmentVariables": {
+              "target": "Package",
+              "version": "[3.1.1, )"
+            },
+            "Microsoft.Extensions.Configuration.FileExtensions": {
+              "target": "Package",
+              "version": "[3.1.1, )"
+            },
+            "Microsoft.Extensions.Configuration.Json": {
+              "target": "Package",
+              "version": "[3.1.1, )"
+            },
+            "Microsoft.Extensions.DependencyInjection": {
+              "target": "Package",
+              "version": "[3.1.1, )"
+            },
+            "Microsoft.Extensions.Http": {
+              "target": "Package",
+              "version": "[3.1.1, )"
+            },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[12.0.3, )"
+            },
+            "System.Net.Http": {
+              "target": "Package",
+              "version": "[4.3.4, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48"
+          ],
+          "assetTargetFallback": true,
+          "warn": true
+        }
+      }
+    }
+  }
+}
