@@ -1,0 +1,60 @@
+image: $IMAGE
+
+stages:
+  - create_version
+  - build_service
+  - publish
+
+create_version:
+ stage: create_version
+ script:
+  - cat $SEM_RELEASE_OPTIONS > .releaserc.yml
+  - semantic-release -d -e @semantic-release/gitlab
+  - semantic-release -d -e @semantic-release/gitlab | awk '/^# /,/\(/{print $2}' > $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
+  - if [ -s "./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version" ]; then echo "version file contains data"; else echo "version file blank, exiting"; exit 1; fi
+ artifacts:
+  paths:
+  - ./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
+  name: "$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version"
+ cache:
+  key: "$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version"
+  paths:
+  - ./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
+ only:
+  - master
+
+build_service:
+ stage: build_service
+ before_script:
+  - 'dotnet restore'
+  - 'export VERSION=$(cat $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version)'
+ script:
+  - 'dotnet build -c Release -p:AssemblyVersion=$VERSION -p:PackageVersion=$VERSION'
+  - 'dotnet publish -c Release -p:AssemblyVersion=$VERSION -p:PackageVersion=$VERSION'
+ artifacts:
+  paths:
+  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/*
+  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/Ionburst.SDK.dll
+  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/*.json
+  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg
+  name: "$CI_PROJECT_NAME-$CI_JOB_ID"
+  when: on_success
+ cache:
+  untracked: true
+  key: "$CI_COMMIT_SHA"
+  paths:
+  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg
+ only:
+  - master
+
+publish:
+ stage: publish
+ cache:
+  key: "$CI_COMMIT_SHA"
+ script:
+  - 'cat $SEM_RELEASE_OPTIONS > .releaserc.yml'
+  - 'semantic-release -e @semantic-release/gitlab'
+  - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NEXUS_KEY -s $NEXUS_REPO'
+  - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NUGET_KEY -s https://api.nuget.org/v3/index.json'
+ only:
+  - master
