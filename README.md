@@ -22,12 +22,19 @@ The [Gitlab issues][sdk-issues] are intended for bug reports and feature request
 
 ## SDK Change Log
 
+The change log for the SDK can be found in the Gitlab Releases [page](https://gitlab.com/ionburst/ionburst-sdk-net/-/releases)
+
 ## Versioning
+
+The Ionburst SDK for .NET uses Semantic Versioning, e.g. MAJOR.MINOR.PATCH.
 
 ## Tests
 
 ### NuGet Packages
 
+* [Ionburst.SDK](https://www.nuget.org/packages/Ionburst.SDK/)
+	* The **Ionburst SDK for .NET** enables .NET developers to easily work with [Ionburst][ionburst] and build ultra-secure and private storage into their applications.
+	
 [nuget-info]: https://nuget.org/
 [ionburst]: https://ionburst.io
 [sdk-website]: https://docs.ionburst.io/#/sdk
