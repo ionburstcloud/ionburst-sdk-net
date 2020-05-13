@@ -25,6 +25,11 @@ namespace Ionburst.SDK
         private JwtRequest _jwtRequest = null;
         private object _jwtLock = new object();
 
+        internal class DeferredResult
+        {
+            public Guid DeferredToken { get; set; }
+        }
+
         internal ApiHandler(IonburstSDKSettings settings, JwtRequest jwtRequest)
         {
             IServiceCollection serviceCollection = new ServiceCollection();
@@ -380,7 +385,9 @@ namespace Ionburst.SDK
                             if (getResponse.StatusCode == System.Net.HttpStatusCode.OK)
                             {
                                 // Success
-                                deferredToken = await getResponse.Content.ReadAsStringAsync();
+                                string tokenResponse = await getResponse.Content.ReadAsStringAsync();
+                                DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
+                                deferredToken = tokenObject.DeferredToken.ToString();
                             }
                             else if (getResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                             {
@@ -746,7 +753,9 @@ namespace Ionburst.SDK
                                 if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
                                 {
                                     // Success
-                                    deferredToken = await putResponse.Content.ReadAsStringAsync();
+                                    string tokenResponse = await putResponse.Content.ReadAsStringAsync();
+                                    DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
+                                    deferredToken = tokenObject.DeferredToken.ToString();
                                 }
                                 else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                                 {
