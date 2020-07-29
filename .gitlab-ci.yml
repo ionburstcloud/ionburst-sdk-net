@@ -10,8 +10,9 @@ create_version:
  script:
   - cat $SEM_RELEASE_OPTIONS > .releaserc.yml
   - semantic-release -d -e @semantic-release/gitlab
-  - semantic-release -d -e @semantic-release/gitlab | awk '/^## /,/\(/{print $2}' > $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
-  - if [ -s "./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version" ]; then echo "version file contains data"; else echo "version file blank, exiting"; exit 1; fi
+  - semantic-release -d -e @semantic-release/gitlab | awk '/^# /,/\(/{print $2}' > $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
+  - if [ -s "./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version" ]; then echo "version file contains data"; else semantic-release -d -e @semantic-release/gitlab | awk '/^## /,/\(/{print $2}' > $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
+  - if [ ! -s "./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version" ]; then echo "final version file check failed"; exit 1; else echo "final check good - continue!"; fi
  artifacts:
   paths:
   - ./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
