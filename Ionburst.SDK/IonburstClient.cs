@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.IO;
 
+using Microsoft.Extensions.Configuration;
+
 using Ionburst.SDK.Model;
 
 namespace Ionburst.SDK
@@ -16,16 +18,37 @@ namespace Ionburst.SDK
         private readonly string _uriDataPath = "api/Data/";
         private readonly string _uriClassiticationPath = "api/Classification/";
         private readonly string _uriJwtPath = "api/signin";
-        private IonburstSDKSettings _settings = new IonburstSDKSettings();
+        private IonburstSDKSettings _settings = null;
 
         public IonburstClient()
         {
+            _settings = new IonburstSDKSettings();
             CreateIonBurstClient(_settings.IonBurstUri);
         }
 
         public IonburstClient(string serverUri)
         {
+            _settings = new IonburstSDKSettings();
             CreateIonBurstClient(serverUri);
+        }
+
+        public IonburstClient(IConfiguration externalConfiguration)
+        {
+            _settings = new IonburstSDKSettings(externalConfiguration);
+            CreateIonBurstClient(_settings.IonBurstUri);
+        }
+
+        public IonburstClient(IConfiguration externalConfiguration, string serverUri)
+        {
+            _settings = new IonburstSDKSettings(externalConfiguration);
+            if (serverUri != null && serverUri != string.Empty)
+            {
+                CreateIonBurstClient(serverUri);
+            }
+            else
+            {
+                CreateIonBurstClient(_settings.IonBurstUri);
+            }
         }
 
         public void CreateIonBurstClient(string serverUri)
@@ -329,6 +352,11 @@ namespace Ionburst.SDK
             GetPolicyClassificationResult result = await GetClassificationsAsync(request);
             result.DelegateTag = request.DelegateTag;
             request.RequestResult?.Invoke(result);
+        }
+
+        public async Task<long> GetUploadSizeLimit()
+        {
+            return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriDataPath}/query/uploadsizelimit");
         }
 
         public async Task<bool> CheckIonBurstAPI()

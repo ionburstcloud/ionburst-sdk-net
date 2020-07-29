@@ -29,6 +29,8 @@ namespace Ionburst.SDK
         Task<GetPolicyClassificationResult> GetClassificationsAsync(GetPolicyClassificationRequest request);
         bool GetClassificationsWithCallback(GetPolicyClassificationRequest request);
 
+        Task<long> GetUploadSizeLimit();
+
         Task<bool> CheckIonBurstAPI();
 
         Task<List<string>> GetVersionDetails();

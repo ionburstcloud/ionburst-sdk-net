@@ -22,21 +22,49 @@ namespace Ionburst.SDK
         public DateTime JWTUpdateTime { get; set; }
         public bool TraceCredentialsFile { get; set; }
         public string ProfilesLocation { get; set; }
+        private IConfiguration _configuration { get; set; }
 
         public IonburstSDKSettings()
         {
+            BuildConfiguation();
+            BuildIonburstSDKSettings();
+        }
+
+        public IonburstSDKSettings(IConfiguration externalConfiguration)
+        {
+            BuildConfiguation(externalConfiguration);
+            BuildIonburstSDKSettings();
+        }
+
+        private void BuildConfiguation(IConfiguration externalConfiguration = null)
+        {
             string environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-
-            IConfiguration configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
-                .AddEnvironmentVariables()
-                .Build();
-
+            if (externalConfiguration != null)
+            {
+                _configuration = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
+                    .AddEnvironmentVariables()
+                    .AddConfiguration(externalConfiguration)
+                    .Build();
+            }
+            else
+            {
+                _configuration = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddJsonFile($"appsettings.{environmentName}.json", optional: true)
+                    .AddEnvironmentVariables()
+                    .Build();
+            }
+        }
+        
+        public void BuildIonburstSDKSettings()
+        {
             try
             {
-                if (configuration["Ionburst:TraceCredentialsFile"].ToUpper() == "ON")
+                if (_configuration["Ionburst:TraceCredentialsFile"].ToUpper() == "ON")
                 {
                     TraceCredentialsFile = true;
                 }
@@ -48,21 +76,21 @@ namespace Ionburst.SDK
 
             try
             {
-                ProfilesLocation = configuration["Ionburst:ProfilesLocation"];
+                ProfilesLocation = _configuration["Ionburst:ProfilesLocation"];
             }
             catch (Exception)
             {
                 // Swallow
             }
 
-            IonBurstUri = configuration["IONBURST_URI"];
+            IonBurstUri = _configuration["IONBURST_URI"];
             if (IonBurstUri == null || IonBurstUri == string.Empty)
             {
-                IonBurstUri = configuration["Ionburst:IonBurstUri"];
+                IonBurstUri = _configuration["Ionburst:IonBurstUri"];
             }
 
             CredentialsSet = false;
-            EstablishCredentials(configuration);
+            EstablishCredentials(_configuration);
             if (!CredentialsSet)
             {
                 throw new Exception("IonBurst SDK was not able to establish credentials");

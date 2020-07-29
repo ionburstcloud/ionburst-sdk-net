@@ -30,6 +30,12 @@ namespace Ionburst.SDK
             public Guid DeferredToken { get; set; }
         }
 
+        internal class ClassificationPair
+        {
+            public int id { get; set; }
+            public string label { get; set; }
+        }
+
         internal ApiHandler(IonburstSDKSettings settings, JwtRequest jwtRequest)
         {
             IServiceCollection serviceCollection = new ServiceCollection();
@@ -385,8 +391,8 @@ namespace Ionburst.SDK
                             if (getResponse.StatusCode == System.Net.HttpStatusCode.OK)
                             {
                                 // Success
-                                string tokenResponse = await getResponse.Content.ReadAsStringAsync();
-                                DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
+                                string tokenReponse = await getResponse.Content.ReadAsStringAsync();
+                                DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenReponse);
                                 deferredToken = tokenObject.DeferredToken.ToString();
                             }
                             else if (getResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -553,6 +559,11 @@ namespace Ionburst.SDK
                         {
                             requestString = $"{requestString}?classstr={request.PolicyClassification}";
                         }
+                        else
+                        {
+                            requestString = $"{requestString}?classid={request.PolicyClassificationId}";
+                        }
+
                         Uri requestUri = new Uri(requestString);
                         using (HttpClient putClient = _httpClientFactory.CreateClient())
                         {
@@ -731,6 +742,10 @@ namespace Ionburst.SDK
                         {
                             requestString = $"{requestString}?classstr={request.PolicyClassification}";
                         }
+                        else
+                        {
+                            requestString = $"{requestString}?classid={request.PolicyClassificationId}";
+                        }
                         Uri requestUri = new Uri(requestString);
                         using (HttpClient getClient = _httpClientFactory.CreateClient())
                         {
@@ -803,9 +818,15 @@ namespace Ionburst.SDK
                 }
                 else
                 {
+                    requestUriString = $"{requestUriString}?displaytag=both";
                     Uri requestUri = new Uri(requestUriString);
                     using (HttpClient httpClient = _httpClientFactory.CreateClient())
                     {
+                        if (_settings.JWT != string.Empty)
+                        {
+                            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.JWT);
+                        }
+
                         Task<HttpResponseMessage> getTask = httpClient.GetAsync(requestUri);
                         HttpResponseMessage getResponse = await getTask;
                         result.StatusCode = Convert.ToInt32(getResponse.StatusCode);
@@ -814,7 +835,21 @@ namespace Ionburst.SDK
                             // Success
                             try
                             {
-                                result.ClassificationList = JsonConvert.DeserializeObject<List<string>>(await getResponse.Content.ReadAsStringAsync());
+                                string classResponse = await getResponse.Content.ReadAsStringAsync();
+                                List<ClassificationPair> classificationPairs = JsonConvert.DeserializeObject<List<ClassificationPair>>(classResponse);
+                                if (classificationPairs.Count > 0)
+                                {
+                                    result.ClassificationDictionary = new Dictionary<int, string>();
+                                    result.ClassificationIdList = new List<int>();
+                                    result.ClassificationList = new List<string>();
+
+                                    foreach(ClassificationPair pair in classificationPairs)
+                                    {
+                                        result.ClassificationDictionary.Add(pair.id, pair.label);
+                                        result.ClassificationIdList.Add(pair.id);
+                                        result.ClassificationList.Add(pair.label);
+                                    }
+                                }
                             }
                             catch (Exception e)
                             {
@@ -944,6 +979,32 @@ namespace Ionburst.SDK
                     }
                 }
             }
+        }
+
+        internal async Task<long> GetUploadSizeLimit(string request)
+        {
+            long limit = 0;
+
+            try
+            {
+                Uri requestUri = new Uri(request);
+                using (HttpClient httpClient = _httpClientFactory.CreateClient())
+                {
+                    HttpResponseMessage sizeResponse = await httpClient.GetAsync(requestUri);
+                    if (sizeResponse.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        limit = Convert.ToInt64(sizeResponse.Content.ReadAsStringAsync().Result);
+                    }
+                }
+            }
+            catch (WebException)
+            {
+            }
+            catch (Exception)
+            {
+            }
+
+            return limit;
         }
 
         internal async Task<bool> CheckApi(string request)
