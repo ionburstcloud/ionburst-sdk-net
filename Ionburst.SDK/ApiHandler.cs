@@ -391,9 +391,17 @@ namespace Ionburst.SDK
                             if (getResponse.StatusCode == System.Net.HttpStatusCode.OK)
                             {
                                 // Success
-                                string tokenReponse = await getResponse.Content.ReadAsStringAsync();
-                                DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenReponse);
-                                deferredToken = tokenObject.DeferredToken.ToString();
+                                string tokenResponse = await getResponse.Content.ReadAsStringAsync();
+                                try
+                                {
+                                    DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
+                                    deferredToken = tokenObject.DeferredToken.ToString();
+                                }
+                                catch (Exception)
+                                {
+                                    // Probably old api giving plain text response
+                                    deferredToken = tokenResponse;
+                                }
                             }
                             else if (getResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                             {
@@ -769,8 +777,16 @@ namespace Ionburst.SDK
                                 {
                                     // Success
                                     string tokenResponse = await putResponse.Content.ReadAsStringAsync();
-                                    DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
-                                    deferredToken = tokenObject.DeferredToken.ToString();
+                                    try
+                                    {
+                                        DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
+                                        deferredToken = tokenObject.DeferredToken.ToString();
+                                    }
+                                    catch (Exception)
+                                    {
+                                        // Probably old api giving plain text response
+                                        deferredToken = tokenResponse;
+                                    }
                                 }
                                 else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                                 {
@@ -836,24 +852,34 @@ namespace Ionburst.SDK
                             try
                             {
                                 string classResponse = await getResponse.Content.ReadAsStringAsync();
-                                List<ClassificationPair> classificationPairs = JsonConvert.DeserializeObject<List<ClassificationPair>>(classResponse);
-                                if (classificationPairs.Count > 0)
+                                // Now depending on api being used this could be a string list or an object list
+                                try
                                 {
-                                    result.ClassificationDictionary = new Dictionary<int, string>();
-                                    result.ClassificationIdList = new List<int>();
-                                    result.ClassificationList = new List<string>();
-
-                                    foreach(ClassificationPair pair in classificationPairs)
+                                    List<ClassificationPair> classificationPairs = JsonConvert.DeserializeObject<List<ClassificationPair>>(classResponse);
+                                    if (classificationPairs.Count > 0)
                                     {
-                                        result.ClassificationDictionary.Add(pair.id, pair.label);
-                                        result.ClassificationIdList.Add(pair.id);
-                                        result.ClassificationList.Add(pair.label);
+                                        result.ClassificationDictionary = new Dictionary<int, string>();
+                                        result.ClassificationIdList = new List<int>();
+                                        result.ClassificationList = new List<string>();
+
+                                        foreach (ClassificationPair pair in classificationPairs)
+                                        {
+                                            result.ClassificationDictionary.Add(pair.id, pair.label);
+                                            result.ClassificationIdList.Add(pair.id);
+                                            result.ClassificationList.Add(pair.label);
+                                        }
                                     }
+                                }
+                                catch (Exception)
+                                {
+                                    // Most likely string list response from old api
+                                    result.ClassificationList = JsonConvert.DeserializeObject<List<string>>(classResponse);
                                 }
                             }
                             catch (Exception e)
                             {
                                 result.StatusMessage = $"SDK exception handling GET response content: {e.Message}";
+                                result.StatusCode = 99;
                             }
                         }
                         else

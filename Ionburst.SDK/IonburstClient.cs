@@ -356,12 +356,12 @@ namespace Ionburst.SDK
 
         public async Task<long> GetUploadSizeLimit()
         {
-            return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriDataPath}/query/uploadsizelimit");
+            return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriDataPath}query/uploadsizelimit");
         }
 
         public async Task<bool> CheckIonBurstAPI()
         {
-            bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}/web/check");
+            bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}web/check");
 
             return apiResponds;
         }
@@ -370,7 +370,7 @@ namespace Ionburst.SDK
         {
             List<string> versionDetails = new List<string>();
 
-            string apiVersion = await _apiHandler.GetAPIVersion($"{_serverUri}{_uriDataPath}/assembly/version");
+            string apiVersion = await _apiHandler.GetAPIVersion($"{_serverUri}{_uriDataPath}assembly/version");
             versionDetails.Add($"API version: {apiVersion}");
             versionDetails.Add($"SDK version: {Assembly.GetExecutingAssembly().GetName().Version.ToString()}");
 
