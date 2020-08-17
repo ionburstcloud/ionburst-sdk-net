@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 
 using Ionburst.SDK.Model;
+using System;
 
 namespace Ionburst.SDK
 {
@@ -32,6 +33,9 @@ namespace Ionburst.SDK
         Task<long> GetUploadSizeLimit();
 
         Task<string> GetConfiguredUri();
+
+        [Obsolete("Use CheckIonburstAPI")]
+        Task<bool> CheckIonBurstAPI();
 
         Task<bool> CheckIonburstAPI();
 

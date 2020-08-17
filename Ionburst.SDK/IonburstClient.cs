@@ -443,6 +443,14 @@ namespace Ionburst.SDK
             }
         }
 
+        [Obsolete("Use CheckIonburstAPI")]
+        public async Task<bool> CheckIonBurstAPI()
+        {
+            bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}web/check");
+
+            return apiResponds;
+        }
+
         public async Task<bool> CheckIonburstAPI()
         {
             bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}web/check");
