@@ -31,7 +31,9 @@ namespace Ionburst.SDK
 
         Task<long> GetUploadSizeLimit();
 
-        Task<bool> CheckIonBurstAPI();
+        Task<string> GetConfiguredUri();
+
+        Task<bool> CheckIonburstAPI();
 
         Task<List<string>> GetVersionDetails();
 

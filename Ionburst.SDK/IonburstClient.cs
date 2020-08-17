@@ -23,19 +23,19 @@ namespace Ionburst.SDK
         public IonburstClient()
         {
             _settings = new IonburstSDKSettings();
-            CreateIonBurstClient(_settings.IonBurstUri);
+            CreateIonburstClient(_settings.IonburstUri);
         }
 
         public IonburstClient(string serverUri)
         {
             _settings = new IonburstSDKSettings();
-            CreateIonBurstClient(serverUri);
+            CreateIonburstClient(serverUri);
         }
 
         public IonburstClient(IConfiguration externalConfiguration)
         {
             _settings = new IonburstSDKSettings(externalConfiguration);
-            CreateIonBurstClient(_settings.IonBurstUri);
+            CreateIonburstClient(_settings.IonburstUri);
         }
 
         public IonburstClient(IConfiguration externalConfiguration, string serverUri)
@@ -43,14 +43,15 @@ namespace Ionburst.SDK
             _settings = new IonburstSDKSettings(externalConfiguration);
             if (serverUri != null && serverUri != string.Empty)
             {
-                CreateIonBurstClient(serverUri);
+                CreateIonburstClient(serverUri);
             }
             else
             {
-                CreateIonBurstClient(_settings.IonBurstUri);
+                CreateIonburstClient(_settings.IonburstUri);
             }
         }
 
+        [Obsolete("Use CreateIonburstClient")]
         public void CreateIonBurstClient(string serverUri)
         {
             if (serverUri != null && serverUri != string.Empty)
@@ -68,8 +69,8 @@ namespace Ionburst.SDK
                 {
                     Server = _serverUri,
                     Routing = _uriJwtPath,
-                    Id = _settings.IonBurstId,
-                    Key = _settings.IonBurstKey
+                    Id = _settings.IonburstId,
+                    Key = _settings.IonburstKey
                 };
 
                 _apiHandler = new ApiHandler(_settings, jwtRequest);
@@ -86,17 +87,88 @@ namespace Ionburst.SDK
                 {
                     if (jwtResponse.StatusCode == 500)
                     {
-                        throw new Exception("SDK cannot connect to API", jwtResponse.Exception);
+                        throw new IonburstServiceException("SDK cannot connect to API", jwtResponse.Exception);
+                    }
+                    else if (jwtResponse.StatusCode == 503)
+                    {
+                        throw new IonburstServiceUnavailableException("Ionburst API service is not available", jwtResponse.Exception);
                     }
                     else
                     {
-                        throw new Exception($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusMessage} - {jwtResponse.StatusMessage}");
+                        if (jwtResponse.Exception != null)
+                        {
+                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}", jwtResponse.Exception);
+                        }
+                        else
+                        {
+                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}");
+                        }
                     }
                 }
             }
             else
             {
-                throw new Exception("IonBurst URL not in configuration or supplied from client");
+                throw new IonburstUriUndefinedException("Ionburst URL not in configuration or supplied from client");
+            }
+        }
+
+        public void CreateIonburstClient(string serverUri)
+        {
+            if (serverUri != null && serverUri != string.Empty)
+            {
+                if (serverUri.EndsWith("/"))
+                {
+                    _serverUri = serverUri;
+                }
+                else
+                {
+                    _serverUri = $"{serverUri}/";
+                }
+
+                JwtRequest jwtRequest = new JwtRequest()
+                {
+                    Server = _serverUri,
+                    Routing = _uriJwtPath,
+                    Id = _settings.IonburstId,
+                    Key = _settings.IonburstKey
+                };
+
+                _apiHandler = new ApiHandler(_settings, jwtRequest);
+
+                // Get first JWT
+                JwtResponse jwtResponse = _apiHandler.GetJWT(jwtRequest).Result;
+                if (jwtResponse.StatusCode == 200)
+                {
+                    _settings.JWT = jwtResponse.JWT;
+                    _settings.JWTAssigned = true;
+                    _settings.JWTUpdateTime = DateTime.Now;
+                }
+                else
+                {
+                    if (jwtResponse.StatusCode == 500)
+                    {
+                        throw new IonburstServiceException("SDK cannot connect to API", jwtResponse.Exception);
+                    }
+                    else if (jwtResponse.StatusCode == 503)
+                    {
+                        throw new IonburstServiceUnavailableException("Ionburst API service is not available", jwtResponse.Exception);
+                    }
+                    else
+                    {
+                        if (jwtResponse.Exception != null)
+                        {
+                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}", jwtResponse.Exception);
+                        }
+                        else
+                        {
+                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                throw new IonburstUriUndefinedException("Ionburst URL not in configuration or supplied from client");
             }
         }
 
@@ -359,7 +431,19 @@ namespace Ionburst.SDK
             return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriDataPath}query/uploadsizelimit");
         }
 
-        public async Task<bool> CheckIonBurstAPI()
+        public async Task<string> GetConfiguredUri()
+        {
+            if (_settings.IonburstUri != null && _settings.IonburstUri != string.Empty)
+            {
+                return await Task.FromResult(_settings.IonburstUri);
+            }
+            else
+            {
+                return await Task.FromResult("An Ionburst server URI has not been configured");
+            }
+        }
+
+        public async Task<bool> CheckIonburstAPI()
         {
             bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}web/check");
 

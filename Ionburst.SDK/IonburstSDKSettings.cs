@@ -15,9 +15,9 @@ namespace Ionburst.SDK
     {
         public string JWT { get; set; }
         public bool JWTAssigned { get; set; }
-        public string IonBurstId { get; set; }
-        public string IonBurstKey { get; set; }
-        public string IonBurstUri { get; set; }
+        public string IonburstId { get; set; }
+        public string IonburstKey { get; set; }
+        public string IonburstUri { get; set; }
         public bool CredentialsSet { get; set; }
         public DateTime JWTUpdateTime { get; set; }
         public bool TraceCredentialsFile { get; set; }
@@ -83,26 +83,30 @@ namespace Ionburst.SDK
                 // Swallow
             }
 
-            IonBurstUri = _configuration["IONBURST_URI"];
-            if (IonBurstUri == null || IonBurstUri == string.Empty)
+            IonburstUri = _configuration["IONBURST_URI"];
+            if (IonburstUri == null || IonburstUri == string.Empty)
             {
-                IonBurstUri = _configuration["Ionburst:IonBurstUri"];
+                IonburstUri = _configuration["Ionburst:IonburstUri"];
+                if (IonburstUri == null || IonburstUri == string.Empty)
+                {
+                    IonburstUri = _configuration["Ionburst:IonBurstUri"];
+                }
             }
 
             CredentialsSet = false;
             EstablishCredentials(_configuration);
             if (!CredentialsSet)
             {
-                throw new Exception("IonBurst SDK was not able to establish credentials");
+                throw new IonburstCredentialsUndefinedException("Ionburst SDK was not able to establish credentials");
             }
         }
 
         private void EstablishCredentials(IConfiguration configuration)
         {
             // Try environment variables first
-            IonBurstId = configuration["IONBURST_ID"];
-            IonBurstKey = configuration["IONBURST_KEY"];
-            if (IonBurstId != null && IonBurstId != string.Empty && IonBurstKey != null && IonBurstKey != string.Empty)
+            IonburstId = configuration["IONBURST_ID"];
+            IonburstKey = configuration["IONBURST_KEY"];
+            if (IonburstId != null && IonburstId != string.Empty && IonburstKey != null && IonburstKey != string.Empty)
             {
                 CredentialsSet = true;
             }
@@ -129,8 +133,8 @@ namespace Ionburst.SDK
                 profile = profile.Trim();
                 try
                 {
-                    IonBurstId = string.Empty;
-                    IonBurstKey = string.Empty;
+                    IonburstId = string.Empty;
+                    IonburstKey = string.Empty;
                     string credentialsFileName = string.Empty;
                     if (configuration["HOME"] != null)
                     {
@@ -197,32 +201,32 @@ namespace Ionburst.SDK
                                     if (line.Trim().StartsWith("ionburst_id"))
                                     {
                                         string[] pieces = line.Split('=');
-                                        IonBurstId = pieces[1].Trim();
+                                        IonburstId = pieces[1].Trim();
                                         if (TraceCredentialsFile)
                                         {
-                                            Console.WriteLine($"Credentials file parse: set Id={IonBurstId}");
+                                            Console.WriteLine($"Credentials file parse: set Id={IonburstId}");
                                         }
                                     }
                                     if (line.Trim().StartsWith("ionburst_key"))
                                     {
                                         string[] pieces = line.Split('=');
-                                        IonBurstKey = pieces[1].Trim();
+                                        IonburstKey = pieces[1].Trim();
                                         if (TraceCredentialsFile)
                                         {
-                                            Console.WriteLine($"Credentials file parse: set key={IonBurstKey}");
+                                            Console.WriteLine($"Credentials file parse: set key={IonburstKey}");
                                         }
                                     }
                                     if (line.Trim().StartsWith("ionburst_uri"))
                                     {
                                         string[] pieces = line.Split('=');
-                                        IonBurstUri = pieces[1].Trim();
+                                        IonburstUri = pieces[1].Trim();
                                         if (TraceCredentialsFile)
                                         {
-                                            Console.WriteLine($"Credentials file parse: set uri={IonBurstUri}");
+                                            Console.WriteLine($"Credentials file parse: set uri={IonburstUri}");
                                         }
                                     }
                                 }
-                                if (IonBurstId != string.Empty && IonBurstKey != string.Empty)
+                                if (IonburstId != string.Empty && IonburstKey != string.Empty)
                                 {
                                     if (TraceCredentialsFile)
                                     {
@@ -240,7 +244,7 @@ namespace Ionburst.SDK
                     {
                         Console.WriteLine($"Credentials file parse: exceptiom reading credentials file: {e.Message}");
                     }
-                    throw new Exception("Failed to read IonBurst credentials", e);
+                    throw new IonburstCredentialsException("Failed to read Ionburst credentials", e);
                 }
             }
             else

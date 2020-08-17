@@ -15,6 +15,8 @@ using Ionburst.SDK.Model;
 using Ionburst.Api.Model;
 
 using Newtonsoft.Json;
+using System.Net.Cache;
+using System.ComponentModel;
 
 namespace Ionburst.SDK
 {
@@ -935,8 +937,8 @@ namespace Ionburst.SDK
                     Uri requestUri = new Uri(requestUriString);
                     AuthorisationBody authorisationBody = new AuthorisationBody()
                     {
-                        Username = _settings.IonBurstId,
-                        Password = _settings.IonBurstKey
+                        Username = _settings.IonburstId,
+                        Password = _settings.IonburstKey
                     };
                     StringContent authorisationBodyString = new StringContent(JsonConvert.SerializeObject(authorisationBody));
                     authorisationBodyString.Headers.ContentType = new MediaTypeHeaderValue("application/json");
@@ -954,11 +956,15 @@ namespace Ionburst.SDK
                             response.JWT = string.Empty;
                             if (response.StatusCode == 500)
                             {
-                                response.StatusMessage = $"Cannot connect to IonBurst";
+                                response.StatusMessage = $"Cannot connect to Ionburst";
+                            }
+                            else if (response.StatusCode == 503)
+                            {
+                                response.StatusMessage = $"Ionburst unavailable";
                             }
                             else
                             {
-                                response.StatusMessage = $"IonBurst response to JWT request is {jwtResponse.StatusCode}";
+                                response.StatusMessage = $"Ionburst response to JWT request is {jwtResponse.StatusCode}";
                             }
                         }
                     }
