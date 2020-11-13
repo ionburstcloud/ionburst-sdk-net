@@ -236,6 +236,26 @@ namespace Ionburst.SDK
                                 // Success
                                 result.DataStream = new MemoryStream();
                                 await getResponse.Content.CopyToAsync(result.DataStream);
+                                try
+                                {
+                                    IEnumerable<string> tokenList = getResponse.Headers.GetValues("x-activity-token");
+                                    foreach (string tokenValue in tokenList)
+                                    {
+                                        // Only expect one
+                                        try
+                                        {
+                                            result.ActivityToken = new Guid(tokenValue);
+                                        }
+                                        catch (Exception)
+                                        {
+                                            // Swallow
+                                        }
+                                    }
+                                }
+                                catch (Exception)
+                                {
+                                    // Swallow
+                                }
                             }
                             else if (getResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                             {
