@@ -11,15 +11,8 @@ using Ionburst.SDK.Model;
 
 namespace Ionburst.SDK
 {
-    public class IonburstClient : IIonburstClient
+    public class IonburstClient : IonburstClientCommon, IIonburstClient
     {
-        private ApiHandler _apiHandler;
-        private string _serverUri;
-        private readonly string _uriDataPath = "api/Data/";
-        private readonly string _uriClassiticationPath = "api/Classification/";
-        private readonly string _uriJwtPath = "api/signin";
-        private IonburstSDKSettings _settings = null;
-
         public IonburstClient()
         {
             _settings = new IonburstSDKSettings();
@@ -54,122 +47,12 @@ namespace Ionburst.SDK
         [Obsolete("Use CreateIonburstClient")]
         public void CreateIonBurstClient(string serverUri)
         {
-            if (serverUri != null && serverUri != string.Empty)
-            {
-                if (serverUri.EndsWith("/"))
-                {
-                    _serverUri = serverUri;
-                }
-                else
-                {
-                    _serverUri = $"{serverUri}/";
-                }
-
-                JwtRequest jwtRequest = new JwtRequest()
-                {
-                    Server = _serverUri,
-                    Routing = _uriJwtPath,
-                    Id = _settings.IonburstId,
-                    Key = _settings.IonburstKey
-                };
-
-                _apiHandler = new ApiHandler(_settings, jwtRequest);
-
-                // Get first JWT
-                JwtResponse jwtResponse = _apiHandler.GetJWT(jwtRequest).Result;
-                if (jwtResponse.StatusCode == 200)
-                {
-                    _settings.JWT = jwtResponse.JWT;
-                    _settings.JWTAssigned = true;
-                    _settings.JWTUpdateTime = DateTime.Now;
-                }
-                else
-                {
-                    if (jwtResponse.StatusCode == 500)
-                    {
-                        throw new IonburstServiceException("SDK cannot connect to API", jwtResponse.Exception);
-                    }
-                    else if (jwtResponse.StatusCode == 503)
-                    {
-                        throw new IonburstServiceUnavailableException("Ionburst API service is not available", jwtResponse.Exception);
-                    }
-                    else
-                    {
-                        if (jwtResponse.Exception != null)
-                        {
-                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}", jwtResponse.Exception);
-                        }
-                        else
-                        {
-                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}");
-                        }
-                    }
-                }
-            }
-            else
-            {
-                throw new IonburstUriUndefinedException("Ionburst URL not in configuration or supplied from client");
-            }
+            InternalCreateIonburstClient(serverUri);
         }
 
         public void CreateIonburstClient(string serverUri)
         {
-            if (serverUri != null && serverUri != string.Empty)
-            {
-                if (serverUri.EndsWith("/"))
-                {
-                    _serverUri = serverUri;
-                }
-                else
-                {
-                    _serverUri = $"{serverUri}/";
-                }
-
-                JwtRequest jwtRequest = new JwtRequest()
-                {
-                    Server = _serverUri,
-                    Routing = _uriJwtPath,
-                    Id = _settings.IonburstId,
-                    Key = _settings.IonburstKey
-                };
-
-                _apiHandler = new ApiHandler(_settings, jwtRequest);
-
-                // Get first JWT
-                JwtResponse jwtResponse = _apiHandler.GetJWT(jwtRequest).Result;
-                if (jwtResponse.StatusCode == 200)
-                {
-                    _settings.JWT = jwtResponse.JWT;
-                    _settings.JWTAssigned = true;
-                    _settings.JWTUpdateTime = DateTime.Now;
-                }
-                else
-                {
-                    if (jwtResponse.StatusCode == 500)
-                    {
-                        throw new IonburstServiceException("SDK cannot connect to API", jwtResponse.Exception);
-                    }
-                    else if (jwtResponse.StatusCode == 503)
-                    {
-                        throw new IonburstServiceUnavailableException("Ionburst API service is not available", jwtResponse.Exception);
-                    }
-                    else
-                    {
-                        if (jwtResponse.Exception != null)
-                        {
-                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}", jwtResponse.Exception);
-                        }
-                        else
-                        {
-                            throw new IonburstServiceException($"SDK failed to negotiate with API: HTTP code {jwtResponse.StatusCode} - {jwtResponse.StatusMessage}");
-                        }
-                    }
-                }
-            }
-            else
-            {
-                throw new IonburstUriUndefinedException("Ionburst URL not in configuration or supplied from client");
-            }
+            InternalCreateIonburstClient(serverUri);
         }
 
         // Delete object
@@ -177,13 +60,27 @@ namespace Ionburst.SDK
         public DeleteObjectResult Delete(DeleteObjectRequest request)
         {
             request.CheckValues(_serverUri, _uriDataPath);
-            return (DeleteObjectResult)_apiHandler.ProcessRequest(request).Result;
+            return InternalDelete(request).Result;
+        }
+
+        public DeleteObjectResult SecretsDelete(DeleteObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return InternalDelete(request).Result;
         }
 
         public async Task<DeleteObjectResult> DeleteAsync(DeleteObjectRequest request)
         {
             request.CheckValues(_serverUri, _uriDataPath);
-            return (DeleteObjectResult)await _apiHandler.ProcessRequest(request);
+            return await InternalDelete(request);
+        }
+
+        public async Task<DeleteObjectResult> SecretsDeleteAsync(DeleteObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return await InternalDelete(request);
         }
 
         public bool DeleteWithCallback(DeleteObjectRequest request)
@@ -205,9 +102,40 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
+        public bool SecretsDeleteWithCallback(DeleteObjectRequest request)
+        {
+            bool functionResult = false;
+            if (request.RequestResult != null)
+            {
+                try
+                {
+                    SecretsDelegateDelete(request);
+                    functionResult = true;
+                }
+                catch (Exception)
+                {
+                    // Swallow
+                }
+            }
+
+            return functionResult;
+        }
+
+        private async ValueTask<DeleteObjectResult> InternalDelete(DeleteObjectRequest request)
+        {
+            return (DeleteObjectResult)await _apiHandler.ProcessRequest(request);
+        }
+
         private async void DelegateDelete(DeleteObjectRequest request)
         {
             DeleteObjectResult result = await DeleteAsync(request);
+            result.DelegateTag = request.DelegateTag;
+            request.RequestResult?.Invoke(result);
+        }
+
+        private async void SecretsDelegateDelete(DeleteObjectRequest request)
+        {
+            DeleteObjectResult result = await SecretsDeleteAsync(request);
             result.DelegateTag = request.DelegateTag;
             request.RequestResult?.Invoke(result);
         }
@@ -217,14 +145,29 @@ namespace Ionburst.SDK
         public GetObjectResult Get(GetObjectRequest request)
         {
             request.CheckValues(_serverUri, _uriDataPath);
-            return (GetObjectResult)_apiHandler.ProcessRequest(request).Result;
+            return InternalGet(request).Result;
+        }
+
+        public GetObjectResult SecretsGet(GetObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return InternalGet(request).Result;
         }
 
         public async Task<GetObjectResult> GetAsync(GetObjectRequest request)
         {
             request.CheckValues(_serverUri, _uriDataPath);
             request.CheckTrailingCharacters();
-            return (GetObjectResult)await _apiHandler.ProcessRequest(request);
+            return await InternalGet(request);
+        }
+
+        public async Task<GetObjectResult> SecretsGetAsync(GetObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            request.CheckTrailingCharacters();
+            return await InternalGet(request);
         }
 
         public bool GetWithCallback(GetObjectRequest request)
@@ -246,9 +189,40 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
+        public bool SecretsGetWithCallback(GetObjectRequest request)
+        {
+            bool functionResult = false;
+            if (request.RequestResult != null)
+            {
+                try
+                {
+                    SecretsDelegateGet(request);
+                    functionResult = true;
+                }
+                catch (Exception)
+                {
+                    // Swallow
+                }
+            }
+
+            return functionResult;
+        }
+
+        private async ValueTask<GetObjectResult> InternalGet(GetObjectRequest request)
+        {
+            return (GetObjectResult)await _apiHandler.ProcessRequest(request);
+        }
+
         private async void DelegateGet(GetObjectRequest request)
         {
             GetObjectResult result = await GetAsync(request);
+            result.DelegateTag = request.DelegateTag;
+            request.RequestResult?.Invoke(result);
+        }
+
+        private async void SecretsDelegateGet(GetObjectRequest request)
+        {
+            GetObjectResult result = await SecretsGetAsync(request);
             result.DelegateTag = request.DelegateTag;
             request.RequestResult?.Invoke(result);
         }
@@ -258,13 +232,27 @@ namespace Ionburst.SDK
         public PutObjectResult Put(PutObjectRequest request)
         {
             request.CheckValues(_serverUri, _uriDataPath);
-            return (PutObjectResult)_apiHandler.ProcessRequest(request).Result;
+            return InternalPut(request).Result;
+        }
+
+        public PutObjectResult SecretsPut(PutObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return InternalPut(request).Result;
         }
 
         public async Task<PutObjectResult> PutAsync(PutObjectRequest request)
         {
             request.CheckValues(_serverUri, _uriDataPath);
-            return (PutObjectResult)await _apiHandler.ProcessRequest(request);
+            return await InternalPut(request);
+        }
+
+        public async Task<PutObjectResult> SecretsPutAsync(PutObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return await InternalPut(request);
         }
 
         public bool PutWithCallback(PutObjectRequest request)
@@ -286,9 +274,40 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
+        public bool SecretsPutWithCallback(PutObjectRequest request)
+        {
+            bool functionResult = false;
+            if (request.RequestResult != null)
+            {
+                try
+                {
+                    SecretsDelegatePut(request);
+                    functionResult = true;
+                }
+                catch (Exception)
+                {
+                    // Swallow
+                }
+            }
+
+            return functionResult;
+        }
+
+        private async ValueTask<PutObjectResult> InternalPut(PutObjectRequest request)
+        {
+            return (PutObjectResult)await _apiHandler.ProcessRequest(request);
+        }
+
         private async void DelegatePut(PutObjectRequest request)
         {
             PutObjectResult result = await PutAsync(request);
+            result.DelegateTag = request.DelegateTag;
+            request.RequestResult?.Invoke(result);
+        }
+
+        private async void SecretsDelegatePut(PutObjectRequest request)
+        {
+            PutObjectResult result = await SecretsPutAsync(request);
             result.DelegateTag = request.DelegateTag;
             request.RequestResult?.Invoke(result);
         }
@@ -352,9 +371,21 @@ namespace Ionburst.SDK
 
         public async Task<DeferredActionResult> StartDeferredActionAsync(ObjectRequest request)
         {
+            request.CheckValues(_serverUri, _uriDataPath);
+            return await InternalStartDeferredActionAsync(request);
+        }
+
+        public async Task<DeferredActionResult> SecretsStartDeferredActionAsync(ObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return await InternalStartDeferredActionAsync(request);
+        }
+
+        private async Task<DeferredActionResult> InternalStartDeferredActionAsync(ObjectRequest request)
+        {
             DeferredActionResult result = new DeferredActionResult();
 
-            request.CheckValues(_serverUri, _uriDataPath);
             request.PhasedMode = true;
             if (request is GetObjectRequest getRequest)
             {
@@ -386,92 +417,19 @@ namespace Ionburst.SDK
         public async Task<DeferredCheckResult> CheckDeferredActionAsync(ObjectRequest request)
         {
             request.CheckValues(_serverUri, _uriDataPath);
+            return await InternalCheckDeferredActionAsync(request);
+        }
+
+        public async Task<DeferredCheckResult> SecretsCheckDeferredActionAsync(ObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return await InternalCheckDeferredActionAsync(request);
+        }
+
+        private async ValueTask<DeferredCheckResult> InternalCheckDeferredActionAsync(ObjectRequest request)
+        {
             return await _apiHandler.DeferredRequestCheck(request);
-        }
-
-        // Get classifications
-
-        public GetPolicyClassificationResult GetClassifications(GetPolicyClassificationRequest request)
-        {
-            request.CheckValues(_serverUri, _uriClassiticationPath);
-            return (GetPolicyClassificationResult)_apiHandler.ProcessRequest(request).Result;
-        }
-
-        public async Task<GetPolicyClassificationResult> GetClassificationsAsync(GetPolicyClassificationRequest request)
-        {
-            request.CheckValues(_serverUri, _uriClassiticationPath);
-            return (GetPolicyClassificationResult)await _apiHandler.ProcessRequest(request);
-        }
-
-        public bool GetClassificationsWithCallback(GetPolicyClassificationRequest request)
-        {
-            bool functionResult = false;
-            try
-            {
-                DelegateClassification(request);
-                functionResult = true;
-            }
-            catch (Exception)
-            {
-                // Swallow
-            }
-
-            return functionResult;
-        }
-
-        private async void DelegateClassification(GetPolicyClassificationRequest request)
-        {
-            GetPolicyClassificationResult result = await GetClassificationsAsync(request);
-            result.DelegateTag = request.DelegateTag;
-            request.RequestResult?.Invoke(result);
-        }
-
-        public async Task<long> GetUploadSizeLimit()
-        {
-            return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriDataPath}query/uploadsizelimit");
-        }
-
-        public async Task<string> GetConfiguredUri()
-        {
-            if (_settings.IonburstUri != null && _settings.IonburstUri != string.Empty)
-            {
-                return await Task.FromResult(_settings.IonburstUri);
-            }
-            else
-            {
-                return await Task.FromResult("An Ionburst server URI has not been configured");
-            }
-        }
-
-        [Obsolete("Use CheckIonburstAPI")]
-        public async Task<bool> CheckIonBurstAPI()
-        {
-            bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}web/check");
-
-            return apiResponds;
-        }
-
-        public async Task<bool> CheckIonburstAPI()
-        {
-            bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}web/check");
-
-            return apiResponds;
-        }
-
-        public async Task<List<string>> GetVersionDetails()
-        {
-            List<string> versionDetails = new List<string>();
-
-            string apiVersion = await _apiHandler.GetAPIVersion($"{_serverUri}{_uriDataPath}assembly/version");
-            versionDetails.Add($"API version: {apiVersion}");
-            versionDetails.Add($"SDK version: {Assembly.GetExecutingAssembly().GetName().Version.ToString()}");
-
-            return versionDetails;
-        }
-
-        public void SimulateBadTokenForTesting()
-        {
-            _apiHandler.SimulateBadToken();
         }
     }
 }

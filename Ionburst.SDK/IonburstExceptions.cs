@@ -1,4 +1,4 @@
-﻿// Copyright Cyborn Limited 2020
+﻿// Copyright Ionburst Limited 2020
 using System;
 
 namespace Ionburst.SDK
