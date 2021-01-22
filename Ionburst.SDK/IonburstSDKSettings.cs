@@ -233,7 +233,6 @@ namespace Ionburst.SDK
                                         Console.WriteLine("Credentials file parse: found both Id and Key; considered success");
                                     }
                                     CredentialsSet = true;
-                                    break;
                                 }
                             }
                         }
