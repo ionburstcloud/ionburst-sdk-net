@@ -231,9 +231,9 @@ namespace Ionburst.SDK
                                     if (TraceCredentialsFile)
                                     {
                                         Console.WriteLine("Credentials file parse: found both Id and Key; considered success");
-                                        break;
                                     }
                                     CredentialsSet = true;
+                                    break;
                                 }
                             }
                         }
