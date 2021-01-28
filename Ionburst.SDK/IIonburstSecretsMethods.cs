@@ -9,6 +9,8 @@ namespace Ionburst.SDK
 {
     public interface IIonburstSecretsMethods
     {
+        Task<long> GetSecretsUploadSizeLimit();
+
         DeleteObjectResult SecretsDelete(DeleteObjectRequest request);
         Task<DeleteObjectResult> SecretsDeleteAsync(DeleteObjectRequest request);
         bool SecretsDeleteWithCallback(DeleteObjectRequest request);

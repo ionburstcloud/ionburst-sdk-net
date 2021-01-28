@@ -320,44 +320,75 @@ namespace Ionburst.SDK
 
         private async Task<GetObjectResult> ProcessPhasedGetRequest(GetObjectRequest request)
         {
-            GetObjectResult result = new GetObjectResult();
+            GetObjectResult result = new GetObjectResult()
+            {
+                StatusMessage = string.Empty
+            };
             DeferredCheckResult deferredResult = new DeferredCheckResult();
 
             try
             {
                 // Start deferred GET
-                request.DeferredToken = new Guid(await InitiateDeferredGet(request));
-                if (request.DeferredToken != Guid.Empty)
+                DeferredResponse deferredResponse = await InitiateDeferredGet(request);
+                if (deferredResponse.Status == 200)
                 {
-                    // Deferred GET is started, so check it
-                    int checkCount = 0;
-                    bool actionComplete = false;
-                    while (!actionComplete)
+                    try
                     {
-                        // Eventually, either the workflow will complete or the deferred details cache entry will expire giving a 404
-                        if (checkCount++ < 21)
-                        {
-                            Thread.Sleep(500);
-                        }
-                        else
-                        {
-                            Thread.Sleep(1000);
-                        }
-                        deferredResult = await DeferredRequestCheck(request);
-                        actionComplete = deferredResult.ActionComplete;
+                        request.DeferredToken = new Guid(deferredResponse.DeferredToken);
                     }
-                    if (actionComplete)
+                    catch (Exception e)
                     {
-                        if (deferredResult.StatusCode == 200)
+                        result.StatusCode = 500;
+                        result.StatusMessage = e.Message;
+                    }
+                    if (request.DeferredToken != Guid.Empty)
+                    {
+                        // Deferred GET is started, so check it
+                        int checkCount = 0;
+                        bool actionComplete = false;
+                        while (!actionComplete)
                         {
-                            result = await ProcessGetRequest(request);
+                            // Eventually, either the workflow will complete or the deferred details cache entry will expire giving a 404
+                            if (checkCount++ < 21)
+                            {
+                                Thread.Sleep(500);
+                            }
+                            else
+                            {
+                                Thread.Sleep(1000);
+                            }
+                            deferredResult = await DeferredRequestCheck(request);
+                            actionComplete = deferredResult.ActionComplete;
                         }
-                        else
+                        if (actionComplete)
                         {
-                            result.ActivityToken = deferredResult.ActivityToken;
-                            result.StatusCode = deferredResult.StatusCode;
-                            result.StatusMessage = deferredResult.StatusMessage;
+                            if (deferredResult.StatusCode == 200)
+                            {
+                                result = await ProcessGetRequest(request);
+                            }
+                            else
+                            {
+                                result.ActivityToken = deferredResult.ActivityToken;
+                                result.StatusCode = deferredResult.StatusCode;
+                                result.StatusMessage = deferredResult.StatusMessage;
+                            }
                         }
+                    }
+                }
+                else
+                {
+                    result.StatusCode = deferredResponse.Status;
+                    if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Not authorized to get data";
+                    }
+                    if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Get operation rejected because quota is exceeded";
+                    }
+                    if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Web server throttling has prevented getting data";
                     }
                 }
             }
@@ -381,9 +412,9 @@ namespace Ionburst.SDK
             return result;
         }
 
-        internal async Task<string> InitiateDeferredGet(GetObjectRequest request)
+        internal async Task<DeferredResponse> InitiateDeferredGet(GetObjectRequest request)
         {
-            string deferredToken = string.Empty;
+            DeferredResponse response = new DeferredResponse();
 
             try
             {
@@ -413,16 +444,17 @@ namespace Ionburst.SDK
                             if (getResponse.StatusCode == System.Net.HttpStatusCode.OK)
                             {
                                 // Success
+                                response.Status = 200;
                                 string tokenResponse = await getResponse.Content.ReadAsStringAsync();
                                 try
                                 {
                                     DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
-                                    deferredToken = tokenObject.DeferredToken.ToString();
+                                    response.DeferredToken = tokenObject.DeferredToken.ToString();
                                 }
                                 catch (Exception)
                                 {
                                     // Probably old api giving plain text response
-                                    deferredToken = tokenResponse;
+                                    response.DeferredToken = tokenResponse;
                                 }
                             }
                             else if (getResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -436,11 +468,16 @@ namespace Ionburst.SDK
                                         RefreshJWT();
                                         makeRequest = true;
                                     }
+                                    else
+                                    {
+                                        response.Status = (int)getResponse.StatusCode;
+                                    }
                                 }
                             }
                             else
                             {
                                 // Not Ok
+                                response.Status = (int)getResponse.StatusCode;
                             }
                         }
                     }
@@ -453,7 +490,7 @@ namespace Ionburst.SDK
             {
             }
 
-            return deferredToken;
+            return response;
         }
 
         internal async Task<DeferredCheckResult> DeferredRequestCheck(ObjectRequest request)
@@ -697,37 +734,72 @@ namespace Ionburst.SDK
 
         private async Task<PutObjectResult> ProcessPhasedPutRequest(PutObjectRequest request)
         {
-            PutObjectResult result = new PutObjectResult();
+            PutObjectResult result = new PutObjectResult
+            {
+                StatusMessage = string.Empty
+            };
             DeferredCheckResult deferredResult = new DeferredCheckResult();
 
             try
             {
                 // Start deferred PUT
-                request.DeferredToken = new Guid(await InitiateDeferredPut(request));
-                if (request.DeferredToken != Guid.Empty)
+                DeferredResponse deferredResponse = await InitiateDeferredPut(request);
+                if (deferredResponse.Status == 200)
                 {
-                    // Deferred PUT is started, so check it
-                    int checkCount = 0;
-                    bool actionComplete = false;
-                    while (!actionComplete)
+                    try
                     {
-                        // Eventually, either the workflow will complete or the deferred details cache entry will expire giving a 404
-                        if (checkCount++ < 21)
-                        {
-                            Thread.Sleep(750);
-                        }
-                        else
-                        {
-                            Thread.Sleep(1500);
-                        }
-                    deferredResult = await DeferredRequestCheck(request);
-                    actionComplete = deferredResult.ActionComplete;
+                        request.DeferredToken = new Guid(deferredResponse.DeferredToken);
                     }
-                    if (actionComplete)
+                    catch (Exception e)
                     {
-                        result.ActivityToken = deferredResult.ActivityToken;
-                        result.StatusCode = deferredResult.StatusCode;
-                        result.StatusMessage = deferredResult.StatusMessage;
+                        result.StatusCode = 500;
+                        result.StatusMessage = e.Message;
+                    }
+                    if (request.DeferredToken != Guid.Empty)
+                    {
+                        // Deferred PUT is started, so check it
+                        int checkCount = 0;
+                        bool actionComplete = false;
+                        while (!actionComplete)
+                        {
+                            // Eventually, either the workflow will complete or the deferred details cache entry will expire giving a 404
+                            if (checkCount++ < 21)
+                            {
+                                Thread.Sleep(750);
+                            }
+                            else
+                            {
+                                Thread.Sleep(1500);
+                            }
+                            deferredResult = await DeferredRequestCheck(request);
+                            actionComplete = deferredResult.ActionComplete;
+                        }
+                        if (actionComplete)
+                        {
+                            result.ActivityToken = deferredResult.ActivityToken;
+                            result.StatusCode = deferredResult.StatusCode;
+                            result.StatusMessage = deferredResult.StatusMessage;
+                        }
+                    }
+                }
+                else
+                {
+                    result.StatusCode = deferredResponse.Status;
+                    if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Not authorized to upload data";
+                    }
+                    if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Upload rejected because quota is exceeded";
+                    }
+                    if (result.StatusCode == 413 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Data is too large to upload";
+                    }
+                    if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Web server throttling has prevented the upload";
                     }
                 }
             }
@@ -751,9 +823,9 @@ namespace Ionburst.SDK
             return result;
         }
 
-        internal async Task<string> InitiateDeferredPut(PutObjectRequest request)
+        internal async Task<DeferredResponse> InitiateDeferredPut(PutObjectRequest request)
         {
-            string deferredToken = string.Empty;
+            DeferredResponse response = new DeferredResponse();
 
             try
             {
@@ -798,16 +870,17 @@ namespace Ionburst.SDK
                                 if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
                                 {
                                     // Success
+                                    response.Status = 200;
                                     string tokenResponse = await putResponse.Content.ReadAsStringAsync();
                                     try
                                     {
                                         DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
-                                        deferredToken = tokenObject.DeferredToken.ToString();
+                                        response.DeferredToken = tokenObject.DeferredToken.ToString();
                                     }
                                     catch (Exception)
                                     {
                                         // Probably old api giving plain text response
-                                        deferredToken = tokenResponse;
+                                        response.DeferredToken = tokenResponse;
                                     }
                                 }
                                 else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -821,11 +894,16 @@ namespace Ionburst.SDK
                                             RefreshJWT();
                                             makeRequest = true;
                                         }
+                                        else
+                                        {
+                                            response.Status = (int)putResponse.StatusCode;
+                                        }
                                     }
                                 }
                                 else
                                 {
                                     // Not Ok
+                                    response.Status = (int)putResponse.StatusCode;
                                 }
                             }
                         }
@@ -840,7 +918,7 @@ namespace Ionburst.SDK
             {
             }
 
-            return deferredToken;
+            return response;
         }
 
         private async Task<GetPolicyClassificationResult> ProcessClassificationRequest(GetPolicyClassificationRequest request)

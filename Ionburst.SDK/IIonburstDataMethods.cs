@@ -9,6 +9,8 @@ namespace Ionburst.SDK
 {
     public interface IIonburstDataMethods
     {
+        Task<long> GetDataUploadSizeLimit();
+
         DeleteObjectResult Delete(DeleteObjectRequest request);
         Task<DeleteObjectResult> DeleteAsync(DeleteObjectRequest request);
         bool DeleteWithCallback(DeleteObjectRequest request);

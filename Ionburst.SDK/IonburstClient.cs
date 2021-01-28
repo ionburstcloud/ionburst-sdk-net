@@ -55,6 +55,18 @@ namespace Ionburst.SDK
             InternalCreateIonburstClient(serverUri);
         }
 
+        // Contoller specific request body limits
+
+        public async Task<long> GetDataUploadSizeLimit()
+        {
+            return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriDataPath}query/uploadsizelimit");
+        }
+
+        public async Task<long> GetSecretsUploadSizeLimit()
+        {
+            return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriSecretsPath}query/uploadsizelimit");
+        }
+
         // Delete object
 
         public DeleteObjectResult Delete(DeleteObjectRequest request)
@@ -389,21 +401,79 @@ namespace Ionburst.SDK
             request.PhasedMode = true;
             if (request is GetObjectRequest getRequest)
             {
-                string deferredToken = await _apiHandler.InitiateDeferredGet(getRequest);
-                if (deferredToken != null && deferredToken != string.Empty)
+                DeferredResponse deferredResponse = await _apiHandler.InitiateDeferredGet(getRequest);
+                if (deferredResponse.Status == 200)
                 {
-                    result.StatusCode = 200;
+                    if (deferredResponse.DeferredToken != null && deferredResponse.DeferredToken != string.Empty)
+                    {
+                        try
+                        {
+                            result.DeferredToken = new Guid(deferredResponse.DeferredToken);
+                            result.StatusCode = 200;
+                        }
+                        catch (Exception e)
+                        {
+                            result.StatusCode = 500;
+                            result.StatusMessage = e.Message;
+                        }
+                    }
+                    else
+                    {
+                        result.StatusCode = deferredResponse.Status;
+                        if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
+                        {
+                            result.StatusMessage = "Not authorized to get data";
+                        }
+                        if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
+                        {
+                            result.StatusMessage = "Get operation rejected because quota is exceeded";
+                        }
+                        if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
+                        {
+                            result.StatusMessage = "Web server throttling has prevented getting data";
+                        }
+                    }
                 }
-                result.DeferredToken = new Guid(deferredToken);
             }
             else if (request is PutObjectRequest putRequest)
             {
-                string deferredToken = await _apiHandler.InitiateDeferredPut(putRequest);
-                if (deferredToken != null && deferredToken != string.Empty)
+                DeferredResponse deferredResponse = await _apiHandler.InitiateDeferredPut(putRequest);
+                if (deferredResponse.Status == 200)
                 {
-                    result.StatusCode = 200;
+                    if (deferredResponse.DeferredToken != null && deferredResponse.DeferredToken != string.Empty)
+                    {
+                        try
+                        {
+                            result.DeferredToken = new Guid(deferredResponse.DeferredToken);
+                            result.StatusCode = 200;
+                        }
+                        catch (Exception e)
+                        {
+                            result.StatusCode = 500;
+                            result.StatusMessage = e.Message;
+                        }
+                    }
+                    else
+                    {
+                        result.StatusCode = deferredResponse.Status;
+                        if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
+                        {
+                            result.StatusMessage = "Not authorized to upload data";
+                        }
+                        if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
+                        {
+                            result.StatusMessage = "Upload rejected because quota is exceeded";
+                        }
+                        if (result.StatusCode == 413 && result.StatusMessage == string.Empty)
+                        {
+                            result.StatusMessage = "Data is too large to upload";
+                        }
+                        if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
+                        {
+                            result.StatusMessage = "Web server throttling has prevented the upload";
+                        }
+                    }
                 }
-                result.DeferredToken = new Guid(deferredToken);
             }
             else
             {
