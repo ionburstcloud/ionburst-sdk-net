@@ -29,8 +29,8 @@ build_service:
   - . build_info
   - 'dotnet restore'
  script:
-  - 'dotnet build -c Release -p:AssemblyVersion=$RELEASE_VERSION -p:PackageVersion=$RELEASE_VERSION'
-  - 'dotnet publish -c Release -p:AssemblyVersion=$RELEASE_VERSION -p:PackageVersion=$RELEASE_VERSION'
+  - 'dotnet build -c Release -p:PackageVersion=$RELEASE_VERSION'
+  - 'dotnet publish -c Release -p:PackageVersion=$RELEASE_VERSION'
   - 'cp build_info /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/'
  artifacts:
   paths:
