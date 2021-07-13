@@ -1,37 +1,34 @@
 image: $IMAGE
 
 stages:
-  - create_version
+  - version
   - build_service
   - publish
 
-create_version:
- stage: create_version
- script:
-  - cat $SEM_RELEASE_OPTIONS > .releaserc.yml
-  - semantic-release -d -e @semantic-release/gitlab
-  - semantic-release -d -e @semantic-release/gitlab | awk '/^# /,/\(/{print $2}' > $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
-  - if [ -s "./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version" ]; then echo "version file contains data"; else semantic-release -d -e @semantic-release/gitlab | awk '/^## /,/\(/{print $2}' > $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version; fi
-  - if [ ! -s "./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version" ]; then echo "final version file check failed"; exit 1; else echo "final check good - continue!"; fi
- artifacts:
-  paths:
-  - ./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
-  name: "$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version"
- cache:
-  key: "$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version"
-  paths:
-  - ./$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version
- only:
-  - master
+version:
+  stage: version
+  script:
+   - release next-version --allow-current
+   - release next-version --allow-current > .next-version
+   - echo "RELEASE_SHA=$CI_COMMIT_SHA" > build_info
+   - echo "RELEASE_VERSION=$(cat .next-version)" >> build_info
+   - cat build_info
+   - . build_info
+   - echo $RELEASE_VERSION
+  artifacts:
+    paths:
+      - build_info
 
 build_service:
  stage: build_service
  before_script:
+  - cat build_info
+  - . build_info
   - 'dotnet restore'
-  - 'export VERSION=$(cat $CI_PROJECT_NAME-$CI_COMMIT_REF_NAME-version)'
  script:
-  - 'dotnet build -c Release -p:AssemblyVersion=$VERSION -p:PackageVersion=$VERSION'
-  - 'dotnet publish -c Release -p:AssemblyVersion=$VERSION -p:PackageVersion=$VERSION'
+  - 'dotnet build -c Release -p:AssemblyVersion=$RELEASE_VERSION -p:PackageVersion=$RELEASE_VERSION'
+  - 'dotnet publish -c Release -p:AssemblyVersion=$RELEASE_VERSION -p:PackageVersion=$RELEASE_VERSION'
+  - 'cp build_info /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/'
  artifacts:
   paths:
   - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/*
@@ -53,8 +50,8 @@ publish:
  cache:
   key: "$CI_COMMIT_SHA"
  script:
-  - 'cat $SEM_RELEASE_OPTIONS > .releaserc.yml'
-  - 'semantic-release -e @semantic-release/gitlab'
+  - release changelog
+  - release commit-and-tag CHANGELOG.md build_info
   - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NEXUS_KEY -s $NEXUS_REPO'
   - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NUGET_KEY -s https://api.nuget.org/v3/index.json'
  only:
