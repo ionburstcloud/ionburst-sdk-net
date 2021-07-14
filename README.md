@@ -20,7 +20,7 @@ Please use the following community resources to get help. We use [Gitlab issues]
 
 ### Opening Issues
 
-If you find a bug, or have an issue with the Ionburst SDK for .NET we would like to hear about it. Check the existing [issues][sdk-issues] and try to make sure your problem doesn’t already exist before opening a new issue. It’s helpful if you include the version of Ionburst SDK .NET and the OS you’re using. Please include a stack trace and steps to reproduce the issue.
+If you find a bug, or have an issue with the Ionburst SDK for .NET we would like to hear about it. Check the existing [issues][sdk-issues] and try to make sure your problem doesn’t already exist before opening a new issue. It’s helpful if you include the version of `Ionburst.SDK` and the OS you’re using. Please include a stack trace and steps to reproduce the issue.
 
 The [Gitlab issues][sdk-issues] are intended for bug reports and feature requests. For help and questions with using the Ionburst SDK for .NET please make use of the resources listed in the Getting Help section. There are limited resources available for handling issues and by keeping the list of open issues clean we can respond in a timely manner.
 
