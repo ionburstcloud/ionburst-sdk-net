@@ -15,7 +15,7 @@
 
 ### Fixes
 
-* correction for response handling for deferred functions when the web server middleware prevents the request ([a46519a](https://gitlab.com/ionburst/ionburst-sdk-net/commit/a46519a7536cae19dcfac56b361cdda374c033d6))
+- correction for response handling for deferred functions when the web server middleware prevents the request ([a46519a](https://gitlab.com/ionburst/ionburst-sdk-net/commit/a46519a7536cae19dcfac56b361cdda374c033d6))
 
 ## 1.2.2
 2021-01-22
