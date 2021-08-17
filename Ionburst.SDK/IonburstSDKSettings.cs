@@ -5,7 +5,6 @@ using System.Text;
 using System.IO;
 
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Configuration.FileExtensions;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Configuration.EnvironmentVariables;
 

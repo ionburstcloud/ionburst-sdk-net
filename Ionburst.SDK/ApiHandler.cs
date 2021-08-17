@@ -238,6 +238,10 @@ namespace Ionburst.SDK
                                 await getResponse.Content.CopyToAsync(result.DataStream);
                                 try
                                 {
+                                    // Make sure response stream is at start
+                                    result.DataStream.Seek(0, SeekOrigin.Begin);
+
+                                    // The api will have given us the activity token for passing back to the SDK client
                                     IEnumerable<string> tokenList = getResponse.Headers.GetValues("x-activity-token");
                                     foreach (string tokenValue in tokenList)
                                     {
