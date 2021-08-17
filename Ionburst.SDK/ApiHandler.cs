@@ -15,8 +15,6 @@ using Ionburst.SDK.Model;
 using Ionburst.Api.Model;
 
 using Newtonsoft.Json;
-using System.Net.Cache;
-using System.ComponentModel;
 
 namespace Ionburst.SDK
 {
