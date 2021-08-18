@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.2.5-develop.1
+2021-08-18
+
+### Fixes
+
+- set GetObjectResponse DataStream to position 0 before returning to caller (06fa6ef949b384b2f23bd216179f70e269ce3a21)
+
 ## 1.2.4
 2021-07-14
 
