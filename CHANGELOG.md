@@ -2,7 +2,7 @@
 
 <!--- next entry here -->
 
-## 1.2.5-develop.1
+## 1.2.5-develop.2
 2021-08-18
 
 ### Fixes
