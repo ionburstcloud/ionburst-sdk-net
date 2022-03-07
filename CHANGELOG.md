@@ -2,6 +2,14 @@
 
 <!--- next entry here -->
 
+## 1.2.6
+2022-03-07
+
+### Fixes
+
+- add commit signing and assembly version to build (f4471c947a7c50a11dc8cf976b105fb5c4dfdcd6)
+- upgrade Microsoft.Extensions.* to v6 (9614f60f07e504e9f2a3de3d634c6886a7d29da7)
+
 ## 1.2.6-develop.2
 2022-03-07
 
