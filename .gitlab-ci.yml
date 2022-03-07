@@ -6,58 +6,61 @@ stages:
   - publish
 
 version:
- stage: version
- script:
-  - release next-version --allow-current
-  - release next-version --allow-current > .next-version
-  - echo "RELEASE_SHA=$CI_COMMIT_SHA" > build_info
-  - echo "RELEASE_VERSION=$(cat .next-version)" >> build_info
-  - cat build_info
-  - . build_info
-  - echo $RELEASE_VERSION
- artifacts:
-  paths:
-   - build_info
- only:
-  - develop
-  - main
+  stage: version
+  script:
+    - release next-version --allow-current
+    - release next-version --allow-current > .next-version
+    - echo "RELEASE_SHA=$CI_COMMIT_SHA" > build_info
+    - echo "RELEASE_VERSION=$(cat .next-version)" >> build_info
+    - cat build_info
+    - . build_info
+    - echo $RELEASE_VERSION
+  artifacts:
+    paths:
+      - build_info
+  only:
+    - develop
+    - main
 
 build_service:
- stage: build_service
- before_script:
-  - cat build_info
-  - . build_info
-  - 'dotnet restore'
- script:
-  - 'dotnet build -c Release -p:PackageVersion=$RELEASE_VERSION'
-  - 'dotnet publish -c Release -p:PackageVersion=$RELEASE_VERSION'
-  - 'cp build_info /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/'
- artifacts:
-  paths:
-  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/*
-  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/Ionburst.SDK.dll
-  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/*.json
-  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg
-  name: "$CI_PROJECT_NAME-$CI_JOB_ID"
-  when: on_success
- cache:
-  untracked: true
-  key: "$CI_COMMIT_SHA"
-  paths:
-  - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg
- only:
-  - develop
-  - main
+  stage: build_service
+  before_script:
+    - cat build_info
+    - . build_info
+    - 'echo "Release version is: $RELEASE_VERSION"'
+    - export ASSEMBLY_VERSION=$(echo $RELEASE_VERSION | cut -d "-" -f1)
+    - 'echo "Assembly version is: $ASSEMBLY_VERSION"'
+    - 'dotnet restore'
+  script:
+    - 'dotnet build -c Release -p:PackageVersion=$RELEASE_VERSION -p:AssemblyVersion=$ASSEMBLY_VERSION'
+    - 'dotnet publish -c Release -p:PackageVersion=$RELEASE_VERSION -p:AssemblyVersion=$ASSEMBLY_VERSION'
+    - 'cp build_info /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/'
+  artifacts:
+    paths:
+      - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/publish/*
+      - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/Ionburst.SDK.dll
+      - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/netstandard2.1/*.json
+      - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg
+    name: "$CI_PROJECT_NAME-$CI_JOB_ID"
+    when: on_success
+  cache:
+    untracked: true
+    key: "$CI_COMMIT_SHA"
+    paths:
+      - /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg
+  only:
+    - develop
+    - main
 
 publish:
- stage: publish
- cache:
-  key: "$CI_COMMIT_SHA"
- script:
-  - release changelog
-  - release commit-and-tag CHANGELOG.md build_info
-  - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NEXUS_KEY -s $NEXUS_REPO'
-  - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NUGET_KEY -s https://api.nuget.org/v3/index.json'
- only:
-  - develop
-  - main
+  stage: publish
+  cache:
+    key: "$CI_COMMIT_SHA"
+  script:
+    - release changelog
+    - release commit-and-tag CHANGELOG.md build_info
+    - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NEXUS_KEY -s $NEXUS_REPO'
+    - 'dotnet nuget push /builds/ionburst/ionburst-sdk-net/Ionburst.SDK/bin/Release/*.nupkg -k $NUGET_KEY -s https://api.nuget.org/v3/index.json'
+  only:
+    - develop
+    - main
