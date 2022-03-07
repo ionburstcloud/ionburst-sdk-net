@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.2.6-develop.2
+2022-03-07
+
+### Fixes
+
+- upgrade Microsoft.Extensions.* to v6 (9614f60f07e504e9f2a3de3d634c6886a7d29da7)
+
 ## 1.2.6-develop.1
 2022-03-07
 
