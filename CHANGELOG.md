@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.2.6-develop.1
+2022-03-07
+
+### Fixes
+
+- add commit signing and assembly version to build (f4471c947a7c50a11dc8cf976b105fb5c4dfdcd6)
+
 ## 1.2.5
 2021-08-18
 
