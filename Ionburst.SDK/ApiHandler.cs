@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using Ionburst.SDK.Contracts;
 using Ionburst.SDK.Model;
 using Ionburst.Api.Model;
 
@@ -20,9 +21,10 @@ namespace Ionburst.SDK
 {
     public class ApiHandler
     {
-        private IHttpClientFactory _httpClientFactory = null;
-        private IonburstSDKSettings _settings = null;
-        private JwtRequest _jwtRequest = null;
+        private readonly IHttpClientFactory _httpClientFactory = null;
+        private readonly IonburstSDKSettings _settings = null;
+        private readonly JwtRequest _jwtRequest = null;
+
         private object _jwtLock = new object();
 
         internal class DeferredResult
@@ -619,10 +621,6 @@ namespace Ionburst.SDK
                 {
                     if (request.DataStream.Length > 0)
                     {
-                        request.DataStream.Position = request.StreamPosition;
-                        // Can't put stream in using {} or it will be disposed before use
-                        StreamContent sendData = new StreamContent(request.DataStream);
-                        sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                         string requestString = $"{requestUriString}{request.Particle}";
                         if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
                         {
@@ -648,69 +646,87 @@ namespace Ionburst.SDK
                                 {
                                     putClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.JWT);
                                 }
+                                request.DataStream.Position = request.StreamPosition;
+                                // Can't put stream in using {} or it will be disposed before use
+                                StreamContent sendData = new StreamContent(request.DataStream);
+                                sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
                                 makeRequest = false;
-                                HttpResponseMessage putResponse = await putClient.PutAsync(requestUri, sendData);
-                                requestCount++;
-                                result.StatusCode = Convert.ToInt32(putResponse.StatusCode);
-                                if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
+                                try
                                 {
-                                    // Success
-                                    try
+                                    HttpResponseMessage putResponse = await putClient.PutAsync(requestUri, sendData);
+                                    requestCount++;
+                                    result.StatusCode = Convert.ToInt32(putResponse.StatusCode);
+                                    if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
                                     {
-                                        IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(await putResponse.Content.ReadAsStringAsync());
-                                        result.ActivityToken = output.ActivityToken;
-                                    }
-                                    catch (Exception e)
-                                    {
-                                        result.StatusMessage = $"SDK exception handling PUT response content: {e.Message}";
-                                    }
-                                }
-                                else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                                {
-                                    // Possible that JWT has expired
-                                    if (_settings.JWTAssigned)
-                                    {
-                                        // Had one before so refresh and try again. Once.
-                                        if (requestCount < 2)
-                                        {
-                                            RefreshJWT();
-                                            makeRequest = true;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    // Not Ok
-                                    if (result.StatusCode == 429)
-                                    {
-                                        // Rate limiter has steppeed in
-                                        result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
-                                    }
-                                    else
-                                    {
-                                        // if a WorkflowResult came back, use that
+                                        // Success
                                         try
                                         {
                                             IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(await putResponse.Content.ReadAsStringAsync());
                                             result.ActivityToken = output.ActivityToken;
-                                            result.StatusMessage = output.Message;
                                         }
-                                        catch
+                                        catch (Exception e)
                                         {
-                                            // Just put in the result content
+                                            result.StatusMessage = $"SDK exception handling PUT response content: {e.Message}";
+                                        }
+                                    }
+                                    else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                                    {
+                                        // Possible that JWT has expired
+                                        if (_settings.JWTAssigned)
+                                        {
+                                            // Had one before so refresh and try again. Once.
+                                            if (requestCount < 2)
+                                            {
+                                                RefreshJWT();
+                                                makeRequest = true;
+                                            }
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Not Ok
+                                        if (result.StatusCode == 429)
+                                        {
+                                            // Rate limiter has stepped in
                                             result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
+                                        }
+                                        else if (result.StatusCode == 413)
+                                        {
+                                            // The web server has rejected fot being too large
+                                            result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
+                                        }
+                                        else
+                                        {
+                                            // if a WorkflowResult came back, use that
+                                            try
+                                            {
+                                                IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(await putResponse.Content.ReadAsStringAsync());
+                                                result.ActivityToken = output.ActivityToken;
+                                                result.StatusMessage = output.Message;
+                                            }
+                                            catch
+                                            {
+                                                // Just put in the result content
+                                                result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
+                                            }
                                         }
                                     }
                                 }
+                                catch (Exception e)
+                                {
+                                    result.StatusCode = 500;
+                                    result.StatusMessage = $"Exception making HTTP call or handling response: {e.Message}";
+                                }
+
+                                sendData.Dispose();
                             }
                         }
-                        sendData.Dispose();
                     }
                     else
                     {
                         result.StatusCode = 406;
-                        result.StatusMessage = $"DataStream supplied to SDK has zero length";
+                        result.StatusMessage = "DataStream supplied to SDK has zero length";
                     }
                 }
             }
@@ -836,11 +852,6 @@ namespace Ionburst.SDK
                 {
                     if (request.DataStream.Length > 0)
                     {
-                        request.DataStream.Position = request.StreamPosition;
-                        // Can't put stream in using {} or it will be disposed before use
-                        StreamContent sendData = new StreamContent(request.DataStream);
-                        sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-
                         string requestString = $"{requestUriString}deferred/start/{request.Particle}";
                         if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
                         {
@@ -865,10 +876,15 @@ namespace Ionburst.SDK
                                 {
                                     getClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.JWT);
                                 }
+                                request.DataStream.Position = request.StreamPosition;
+                                // Can't put stream in using {} or it will be disposed before use
+                                StreamContent sendData = new StreamContent(request.DataStream);
+                                sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
                                 makeRequest = false;
                                 HttpResponseMessage putResponse = await getClient.PostAsync(requestUri, sendData);
                                 requestCount++;
+                                response.Status = (int)putResponse.StatusCode;
                                 if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
                                 {
                                     // Success
@@ -902,14 +918,9 @@ namespace Ionburst.SDK
                                         }
                                     }
                                 }
-                                else
-                                {
-                                    // Not Ok
-                                    response.Status = (int)putResponse.StatusCode;
-                                }
+                                sendData.Dispose();
                             }
                         }
-                        sendData.Dispose();
                     }
                 }
             }

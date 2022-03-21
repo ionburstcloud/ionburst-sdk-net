@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Reflection;
 
+using Ionburst.SDK.Contracts;
 using Ionburst.SDK.Model;
 
 namespace Ionburst.SDK
@@ -142,19 +143,6 @@ namespace Ionburst.SDK
             {
                 return await Task.FromResult("An Ionburst server URI has not been configured");
             }
-        }
-
-        [Obsolete("Use CheckIonburstAPI")]
-        public async Task<bool> CheckIonBurstAPI()
-        {
-            bool apiResponds = await _apiHandler.CheckApi($"{_serverUri}web/check");
-            if (!apiResponds)
-            {
-                // Could be older api
-                apiResponds = await _apiHandler.CheckApi($"{_serverUri}{_uriDataPath}web/check");
-            }
-
-            return apiResponds;
         }
 
         public async Task<bool> CheckIonburstAPI()

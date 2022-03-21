@@ -2,7 +2,7 @@
 using System;
 using Ionburst.SDK.Model;
 
-namespace Ionburst.SDK
+namespace Ionburst.SDK.Contracts
 {
     internal class JwtResponse : ObjectResult
     {

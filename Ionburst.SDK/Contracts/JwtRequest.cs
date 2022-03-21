@@ -1,7 +1,7 @@
 ﻿// Copyright Ionburst Limited 2019
 using Ionburst.SDK.Model;
 
-namespace Ionburst.SDK
+namespace Ionburst.SDK.Contracts
 {
     internal class JwtRequest : ObjectRequest
     {

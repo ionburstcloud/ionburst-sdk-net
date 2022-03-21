@@ -1,5 +1,5 @@
 ﻿// Copyright Ionburst Limited 2019
-namespace Ionburst.SDK
+namespace Ionburst.SDK.Contracts
 {
     public class AuthorisationReponse
     {

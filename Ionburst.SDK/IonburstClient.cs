@@ -7,6 +7,7 @@ using System.IO;
 
 using Microsoft.Extensions.Configuration;
 
+using Ionburst.SDK.Contracts;
 using Ionburst.SDK.Model;
 
 namespace Ionburst.SDK
@@ -15,22 +16,24 @@ namespace Ionburst.SDK
     {
         public IonburstClient()
         {
-            _settings = new IonburstSDKSettings();
-            CreateIonburstClient(_settings.IonburstUri);
+            _settings = new IonburstSDKSettings(true);
         }
 
+        [Obsolete("Use client builder")]
         public IonburstClient(string serverUri)
         {
             _settings = new IonburstSDKSettings();
             CreateIonburstClient(serverUri);
         }
 
+        [Obsolete("Use client builder")]
         public IonburstClient(IConfiguration externalConfiguration)
         {
             _settings = new IonburstSDKSettings(externalConfiguration);
             CreateIonburstClient(_settings.IonburstUri);
         }
 
+        [Obsolete("Use client builder")]
         public IonburstClient(IConfiguration externalConfiguration, string serverUri)
         {
             _settings = new IonburstSDKSettings(externalConfiguration);
@@ -44,15 +47,54 @@ namespace Ionburst.SDK
             }
         }
 
-        [Obsolete("Use CreateIonburstClient")]
-        public void CreateIonBurstClient(string serverUri)
+        public void CreateIonburstClient(string serverUri)
         {
             InternalCreateIonburstClient(serverUri);
         }
 
-        public void CreateIonburstClient(string serverUri)
+        public IonburstClient WithIonburstUri(string uri)
         {
-            InternalCreateIonburstClient(serverUri);
+            this._settings.IonburstUri = uri;
+            return this;
+        }
+
+        public IonburstClient WithExternalConfiguration(IConfiguration externalConfiguration)
+        {
+            this._settings.ExternalConfiguration = externalConfiguration;
+            return this;
+        }
+
+        public IonburstClient WithUser(string user)
+        {
+            this._settings.IonburstId = user;
+            return this;
+        }
+
+        public IonburstClient WithPassword(string key)
+        {
+            this._settings.IonburstKey = key;
+            return this;
+        }
+
+        public IonburstClient WithCredential(IonburstCredential credential)
+        {
+            this._settings.IonburstId = credential.IonburstId;
+            this._settings.IonburstKey = credential.IonburstKey;
+            return this;
+        }
+
+        public IonburstClient WithProfile(string profile)
+        {
+            this._settings.IonburstProfile = profile;
+            return this;
+        }
+
+        public IIonburstClient Build()
+        {
+            this._settings.BuildConfiguationFromBuilder();
+            this._settings.BuildIonburstSDKSettings();
+            InternalCreateIonburstClient(_settings.IonburstUri);
+            return this;
         }
 
         // Contoller specific request body limits
@@ -453,25 +495,25 @@ namespace Ionburst.SDK
                             result.StatusMessage = e.Message;
                         }
                     }
-                    else
+                }
+                else
+                {
+                    result.StatusCode = deferredResponse.Status;
+                    if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
                     {
-                        result.StatusCode = deferredResponse.Status;
-                        if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Not authorized to upload data";
-                        }
-                        if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Upload rejected because quota is exceeded";
-                        }
-                        if (result.StatusCode == 413 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Data is too large to upload";
-                        }
-                        if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Web server throttling has prevented the upload";
-                        }
+                        result.StatusMessage = "Not authorized to upload data";
+                    }
+                    if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Upload rejected because quota is exceeded";
+                    }
+                    if (result.StatusCode == 413 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Data is too large to upload";
+                    }
+                    if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Web server throttling has prevented the upload";
                     }
                 }
             }
