@@ -64,13 +64,13 @@ namespace Ionburst.SDK
             return this;
         }
 
-        public IonburstClient WithUser(string user)
+        public IonburstClient WithIonburstId(string user)
         {
             this._settings.IonburstId = user;
             return this;
         }
 
-        public IonburstClient WithPassword(string key)
+        public IonburstClient WithIonburstKey(string key)
         {
             this._settings.IonburstKey = key;
             return this;
