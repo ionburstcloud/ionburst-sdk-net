@@ -119,7 +119,7 @@ namespace Ionburst.SDK
         public CheckObjectResult SecretsCheck(CheckObjectRequest request)
         {
             request.Routing = string.Empty;
-            request.CheckValues(_serverUri, _uriDataPath);
+            request.CheckValues(_serverUri, _uriSecretsPath);
             return InternalCheck(request).Result;
         }
 
@@ -132,7 +132,7 @@ namespace Ionburst.SDK
         public async Task<CheckObjectResult> SecretsCheckAsync(CheckObjectRequest request)
         {
             request.Routing = string.Empty;
-            request.CheckValues(_serverUri, _uriDataPath);
+            request.CheckValues(_serverUri, _uriSecretsPath);
             return await InternalCheck(request);
         }
 
