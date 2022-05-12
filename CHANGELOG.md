@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.3
+2022-05-12
+
+### Fixes
+
+- set correct uri path for Secrets check methods (2352aff9d8148513c5a9bc827756b790e8669fbf)
+
 ## 1.3.0-develop.2
 2022-05-12
 
