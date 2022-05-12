@@ -109,6 +109,90 @@ namespace Ionburst.SDK
             return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriSecretsPath}query/uploadsizelimit");
         }
 
+        // Check object
+        public CheckObjectResult Check(CheckObjectRequest request)
+        {
+            request.CheckValues(_serverUri, _uriDataPath);
+            return InternalCheck(request).Result;
+        }
+
+        public CheckObjectResult SecretsCheck(CheckObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriDataPath);
+            return InternalCheck(request).Result;
+        }
+
+        public async Task<CheckObjectResult> CheckAsync(CheckObjectRequest request)
+        {
+            request.CheckValues(_serverUri, _uriDataPath);
+            return await InternalCheck(request);
+        }
+
+        public async Task<CheckObjectResult> SecretsCheckAsync(CheckObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriDataPath);
+            return await InternalCheck(request);
+        }
+
+        public bool CheckWithCallback(CheckObjectRequest request)
+        {
+            bool functionResult = false;
+            if (request.RequestResult != null)
+            {
+                try
+                {
+                    DelegateCheck(request);
+                    functionResult = true;
+                }
+                catch (Exception)
+                {
+                    // Swallow
+                }
+            }
+
+            return functionResult;
+        }
+
+        public bool SecretsCheckWithCallback(CheckObjectRequest request)
+        {
+            bool functionResult = false;
+            if (request.RequestResult != null)
+            {
+                try
+                {
+                    SecretsDelegateCheck(request);
+                    functionResult = true;
+                }
+                catch (Exception)
+                {
+                    // Swallow
+                }
+            }
+
+            return functionResult;
+        }
+
+        private async Task<CheckObjectResult> InternalCheck(CheckObjectRequest request)
+        {
+            return await _apiHandler.ProcessRequest(request) as CheckObjectResult;
+        }
+
+        private async void DelegateCheck(CheckObjectRequest request)
+        {
+            CheckObjectResult result = await CheckAsync(request);
+            result.DelegateTag = request.DelegateTag;
+            request.RequestResult?.Invoke(result);
+        }
+
+        private async void SecretsDelegateCheck(CheckObjectRequest request)
+        {
+            CheckObjectResult result = await SecretsCheckAsync(request);
+            result.DelegateTag = request.DelegateTag;
+            request.RequestResult?.Invoke(result);
+        }
+
         // Delete object
 
         public DeleteObjectResult Delete(DeleteObjectRequest request)
@@ -175,9 +259,9 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
-        private async ValueTask<DeleteObjectResult> InternalDelete(DeleteObjectRequest request)
+        private async Task<DeleteObjectResult> InternalDelete(DeleteObjectRequest request)
         {
-            return (DeleteObjectResult)await _apiHandler.ProcessRequest(request);
+            return await _apiHandler.ProcessRequest(request) as DeleteObjectResult;
         }
 
         private async void DelegateDelete(DeleteObjectRequest request)
@@ -262,9 +346,9 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
-        private async ValueTask<GetObjectResult> InternalGet(GetObjectRequest request)
+        private async Task<GetObjectResult> InternalGet(GetObjectRequest request)
         {
-            return (GetObjectResult)await _apiHandler.ProcessRequest(request);
+            return await _apiHandler.ProcessRequest(request) as GetObjectResult;
         }
 
         private async void DelegateGet(GetObjectRequest request)
@@ -347,9 +431,9 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
-        private async ValueTask<PutObjectResult> InternalPut(PutObjectRequest request)
+        private async Task<PutObjectResult> InternalPut(PutObjectRequest request)
         {
-            return (PutObjectResult)await _apiHandler.ProcessRequest(request);
+            return await _apiHandler.ProcessRequest(request) as PutObjectResult;
         }
 
         private async void DelegatePut(PutObjectRequest request)
@@ -380,12 +464,14 @@ namespace Ionburst.SDK
                 Particle = request.Particle
             };
             getRequest.CheckValues(_serverUri, _uriDataPath);
-            GetObjectResult getResult = (GetObjectResult)await _apiHandler.ProcessRequest(getRequest);
+            GetObjectResult getResult = await _apiHandler.ProcessRequest(getRequest) as GetObjectResult;
             if (getResult.StatusCode == 200)
             {
                 getResult.DataStream.Seek(0, SeekOrigin.Begin);
-                request.DataStream = new MemoryStream();
-                await getResult.DataStream.CopyToAsync(request.DataStream);
+                MemoryStream ms = new MemoryStream();
+                await getResult.DataStream.CopyToAsync(ms);
+                ms.Seek(0, SeekOrigin.Begin);
+                request.DataStream = ms;
 
                 // Need to delete it before the re-put. Risky
                 DeleteObjectRequest deleteRequest = new DeleteObjectRequest
@@ -393,10 +479,10 @@ namespace Ionburst.SDK
                     Particle = request.Particle
                 };
                 deleteRequest.CheckValues(_serverUri, _uriDataPath);
-                DeleteObjectResult deleteResult = (DeleteObjectResult)await _apiHandler.ProcessRequest(deleteRequest);
+                DeleteObjectResult deleteResult = await _apiHandler.ProcessRequest(deleteRequest) as DeleteObjectResult;
                 if (deleteResult.StatusCode == 200)
                 {
-                    return (PutObjectResult)await _apiHandler.ProcessRequest(request);
+                    return await _apiHandler.ProcessRequest(request) as PutObjectResult;
                 }
                 else
                 {
@@ -539,7 +625,7 @@ namespace Ionburst.SDK
             return await InternalCheckDeferredActionAsync(request);
         }
 
-        private async ValueTask<DeferredCheckResult> InternalCheckDeferredActionAsync(ObjectRequest request)
+        private async Task<DeferredCheckResult> InternalCheckDeferredActionAsync(ObjectRequest request)
         {
             return await _apiHandler.DeferredRequestCheck(request);
         }

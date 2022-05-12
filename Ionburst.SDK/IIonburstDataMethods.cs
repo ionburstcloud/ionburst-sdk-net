@@ -11,6 +11,10 @@ namespace Ionburst.SDK
     {
         Task<long> GetDataUploadSizeLimit();
 
+        CheckObjectResult Check(CheckObjectRequest request);
+        Task<CheckObjectResult> CheckAsync(CheckObjectRequest request);
+        bool CheckWithCallback(CheckObjectRequest request);
+
         DeleteObjectResult Delete(DeleteObjectRequest request);
         Task<DeleteObjectResult> DeleteAsync(DeleteObjectRequest request);
         bool DeleteWithCallback(DeleteObjectRequest request);

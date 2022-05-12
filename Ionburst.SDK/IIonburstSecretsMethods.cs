@@ -11,6 +11,10 @@ namespace Ionburst.SDK
     {
         Task<long> GetSecretsUploadSizeLimit();
 
+        CheckObjectResult SecretsCheck(CheckObjectRequest request);
+        Task<CheckObjectResult> SecretsCheckAsync(CheckObjectRequest request);
+        bool SecretsCheckWithCallback(CheckObjectRequest request);
+
         DeleteObjectResult SecretsDelete(DeleteObjectRequest request);
         Task<DeleteObjectResult> SecretsDeleteAsync(DeleteObjectRequest request);
         bool SecretsDeleteWithCallback(DeleteObjectRequest request);
