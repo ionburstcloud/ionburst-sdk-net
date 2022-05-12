@@ -2,6 +2,17 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.2
+2022-05-12
+
+### Features
+
+- Added CheckObject methods to call API HEAD methods (88eeab07584f056d6d3f37023f9a0bbf1a933af5)
+
+### Fixes
+
+- corrected builder function names to be in line with credentials file attributes (54a7f8c3fb238e3c03beba80a0add6dce4a96b70)
+
 ## 1.3.0-develop.1
 2022-03-21
 
