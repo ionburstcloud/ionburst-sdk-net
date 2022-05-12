@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.1
+2022-03-21
+
+### Features
+
+- option for client to provide credentials to SDK plus some re-structuring (9b9b57dc8a4f58595fd6e825327d8bf9ad5e3fbb)
+
 ## 1.2.6
 2022-03-07
 
