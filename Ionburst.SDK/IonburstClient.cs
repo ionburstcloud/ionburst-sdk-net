@@ -203,6 +203,16 @@ namespace Ionburst.SDK
 
         public DeleteObjectResult SecretsDelete(DeleteObjectRequest request)
         {
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                DeleteManifestResult result = new DeleteManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "DeleteManifestRequest object is not accepted by SecretsDelete"
+                };
+                return result;
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return InternalDelete(request).Result;
@@ -216,6 +226,16 @@ namespace Ionburst.SDK
 
         public async Task<DeleteObjectResult> SecretsDeleteAsync(DeleteObjectRequest request)
         {
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                DeleteManifestResult result = new DeleteManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "DeleteManifestRequest object is not accepted by SecretsDelete"
+                };
+                return await Task.FromResult(result);
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return await InternalDelete(request);
@@ -242,6 +262,11 @@ namespace Ionburst.SDK
 
         public bool SecretsDeleteWithCallback(DeleteObjectRequest request)
         {
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                return false;
+            }
             bool functionResult = false;
             if (request.RequestResult != null)
             {
@@ -273,9 +298,23 @@ namespace Ionburst.SDK
 
         private async void SecretsDelegateDelete(DeleteObjectRequest request)
         {
-            DeleteObjectResult result = await SecretsDeleteAsync(request);
-            result.DelegateTag = request.DelegateTag;
-            request.RequestResult?.Invoke(result);
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                DeleteManifestResult rejectResult = new DeleteManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "DeleteManifestRequest object is not accepted by SecretsDelegateDelete",
+                    DelegateTag = request.DelegateTag
+                };
+                request.RequestResult?.Invoke(rejectResult);
+            }
+            else
+            {
+                DeleteObjectResult result = await SecretsDeleteAsync(request);
+                result.DelegateTag = request.DelegateTag;
+                request.RequestResult?.Invoke(result);
+            }
         }
 
         // Get object
@@ -288,6 +327,16 @@ namespace Ionburst.SDK
 
         public GetObjectResult SecretsGet(GetObjectRequest request)
         {
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                GetManifestResult result = new GetManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "GetManifestRequest object is not accepted by SecretsGet"
+                };
+                return result;
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return InternalGet(request).Result;
@@ -302,6 +351,16 @@ namespace Ionburst.SDK
 
         public async Task<GetObjectResult> SecretsGetAsync(GetObjectRequest request)
         {
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                GetManifestResult result = new GetManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "GetManifestRequest object is not accepted by SecretsGetAsync"
+                };
+                return await Task.FromResult(result);
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             request.CheckTrailingCharacters();
@@ -329,6 +388,11 @@ namespace Ionburst.SDK
 
         public bool SecretsGetWithCallback(GetObjectRequest request)
         {
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                return false;
+            }
             bool functionResult = false;
             if (request.RequestResult != null)
             {
@@ -360,9 +424,23 @@ namespace Ionburst.SDK
 
         private async void SecretsDelegateGet(GetObjectRequest request)
         {
-            GetObjectResult result = await SecretsGetAsync(request);
-            result.DelegateTag = request.DelegateTag;
-            request.RequestResult?.Invoke(result);
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                GetManifestResult rejectResult = new GetManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "GetManifestRequest object is not accepted by SecretsGetAsync",
+                    DelegateTag = request.DelegateTag
+                };
+                request.RequestResult?.Invoke(rejectResult);
+            }
+            else
+            {
+                GetObjectResult result = await SecretsGetAsync(request);
+                result.DelegateTag = request.DelegateTag;
+                request.RequestResult?.Invoke(result);
+            }
         }
 
         // Put object
@@ -375,6 +453,16 @@ namespace Ionburst.SDK
 
         public PutObjectResult SecretsPut(PutObjectRequest request)
         {
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                PutManifestResult result = new PutManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "PutManifestRequest object is not accepted by SecretsPut"
+                };
+                return result;
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return InternalPut(request).Result;
@@ -388,6 +476,16 @@ namespace Ionburst.SDK
 
         public async Task<PutObjectResult> SecretsPutAsync(PutObjectRequest request)
         {
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                PutManifestResult result = new PutManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "PutManifestRequest object is not accepted by SecretsPutAsync"
+                };
+                return await Task.FromResult(result);
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return await InternalPut(request);
@@ -414,6 +512,11 @@ namespace Ionburst.SDK
 
         public bool SecretsPutWithCallback(PutObjectRequest request)
         {
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                return false;
+            }
             bool functionResult = false;
             if (request.RequestResult != null)
             {
@@ -445,9 +548,23 @@ namespace Ionburst.SDK
 
         private async void SecretsDelegatePut(PutObjectRequest request)
         {
-            PutObjectResult result = await SecretsPutAsync(request);
-            result.DelegateTag = request.DelegateTag;
-            request.RequestResult?.Invoke(result);
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                PutManifestResult rejectResult = new PutManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "PutManifestRequest object is not accepted by SecretsDelegatePut",
+                    DelegateTag = request.DelegateTag
+                };
+                request.RequestResult?.Invoke(rejectResult);
+            }
+            else
+            {
+                PutObjectResult result = await SecretsPutAsync(request);
+                result.DelegateTag = request.DelegateTag;
+                request.RequestResult?.Invoke(result);
+            }
         }
 
         public PutObjectResult RePut(PutObjectRequest request)
@@ -524,7 +641,20 @@ namespace Ionburst.SDK
 
         private async Task<DeferredActionResult> InternalStartDeferredActionAsync(ObjectRequest request)
         {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
             DeferredActionResult result = new DeferredActionResult();
+
+            if (request is DeleteManifestRequest || request is GetManifestRequest || request is PutManifestRequest)
+            {
+                // No deferred actions with manifests
+                result.StatusCode = 400;
+                result.StatusMessage = "Manifest requests are not permitted with deferred requests";
+                return await Task.FromResult(result);
+            }
 
             request.PhasedMode = true;
             if (request is GetObjectRequest getRequest)

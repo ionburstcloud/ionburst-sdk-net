@@ -21,6 +21,7 @@ namespace Ionburst.SDK
         public bool CredentialsSet { get; set; }
         public DateTime JWTUpdateTime { get; set; }
         public bool TraceCredentialsFile { get; set; }
+        public long DefaultChunkSize { get; set; }
         public string ProfilesLocation { get; set; }
         public IConfiguration ExternalConfiguration { get; set; }
         private IConfiguration _configuration { get; set; }
@@ -96,6 +97,15 @@ namespace Ionburst.SDK
                 {
                     TraceCredentialsFile = true;
                 }
+            }
+            catch (Exception)
+            {
+                // Swallow
+            }
+
+            try
+            {
+                DefaultChunkSize = Convert.ToInt64(_configuration["Ionburst:DefaultChunkSize"]);
             }
             catch (Exception)
             {

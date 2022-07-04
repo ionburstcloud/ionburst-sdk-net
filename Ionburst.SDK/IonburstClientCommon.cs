@@ -41,7 +41,7 @@ namespace Ionburst.SDK
                     Key = _settings.IonburstKey
                 };
 
-                _apiHandler = new ApiHandler(_settings, jwtRequest);
+                _apiHandler = new ApiHandler(_settings, jwtRequest, _serverUri, _uriDataPath, _uriSecretsPath);
 
                 // Get first JWT
                 JwtResponse jwtResponse = _apiHandler.GetJWT(jwtRequest).Result;

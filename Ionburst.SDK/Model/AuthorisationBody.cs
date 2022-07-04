@@ -1,5 +1,6 @@
 ﻿// Copyright Ionburst Limited 2019
-namespace Ionburst.SDK.Contracts
+
+namespace Ionburst.SDK.Model
 {
     public class AuthorisationBody
     {
