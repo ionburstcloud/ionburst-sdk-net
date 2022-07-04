@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.4
+2022-07-04
+
+### Features
+
+- added option to handle large files by manifest (18e2271dbc694ec69b75900e871b4a977cfdba7e)
+
 ## 1.3.0-develop.3
 2022-05-12
 
