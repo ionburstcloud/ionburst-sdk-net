@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.5
+2022-07-06
+
+### Fixes
+
+- fixes from using SDK in client application (622853528d0d025f09eca49dafb44b9469409673)
+
 ## 1.3.0-develop.4
 2022-07-04
 
