@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.6
+2022-07-06
+
+### Fixes
+
+- speculative stream handling improvements (9db8992f7468472b0bf08e32e0b81477027e11cf)
+
 ## 1.3.0-develop.5
 2022-07-06
 
