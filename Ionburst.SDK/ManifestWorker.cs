@@ -491,64 +491,71 @@ namespace Ionburst.SDK
                         ChunkSize = offset
                     };
 
-                    PutManifestChunk[] putChunkResults = new PutManifestChunk[chunks];
-                    for (int i = 0; i < chunks; i++)
+                    bool waitForPuts = true;
+                    try
                     {
-                        putChunkResults[i] = new PutManifestChunk();
-                    }
-
-                    using (BinaryReader binaryReader = new BinaryReader(request.DataStream))
-                    {
-                        int i = 0;
-                        for (long l = 0; l < inputSize; l += offset)
+                        using (BinaryReader binaryReader = new BinaryReader(request.DataStream))
                         {
-                            long boundary = l + offset;
-                            if (boundary > inputSize)
+                            int i = 0;
+                            for (long l = 0; l < inputSize; l += offset)
                             {
-                                boundary = inputSize;
+                                long boundary = l + offset;
+                                if (boundary > inputSize)
+                                {
+                                    boundary = inputSize;
+                                }
+                                long currentChunkSize = boundary - l;
+
+                                IonburstChunk newChunk = new IonburstChunk()
+                                {
+                                    Ord = i + 1
+                                };
+
+                                byte[] buffer = new byte[currentChunkSize];
+                                binaryReader.BaseStream.Seek(l, SeekOrigin.Begin);
+                                binaryReader.Read(buffer, 0, (int)currentChunkSize);
+
+                                byte[] hashBytes = SHA256.Create().ComputeHash(buffer);
+                                newChunk.Hash = Convert.ToBase64String(hashBytes);
+
+                                manifest.Chunks.Add(newChunk);
+
+                                PutObjectRequest chunkRequest = new PutObjectRequest()
+                                {
+                                    Particle = newChunk.Id.ToString(),
+                                    DataStream = new MemoryStream(buffer),
+                                    Server = request.Server,
+                                    Routing = request.Routing,
+                                    RequestResult = new ResultDelegate(HandleChunkPutComplete),
+                                    DelegateTag = newChunk.Id.ToString(),
+                                    RequestTimeout = new TimeSpan(0, 5, 0),
+                                    TimeoutSpecified = true
+                                };
+                                if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
+                                {
+                                    chunkRequest.PolicyClassification = request.PolicyClassification;
+                                }
+                                else
+                                {
+                                    chunkRequest.PolicyClassificationId = request.PolicyClassificationId;
+                                }
+                                _ = InvokeChunkPut(chunkRequest);
+                                chunkRequest.DataStream.Dispose();
+                                buffer = null;
+                                i++;
                             }
-                            long currentChunkSize = boundary - l;
-
-                            IonburstChunk newChunk = new IonburstChunk()
-                            {
-                                Ord = i + 1
-                            };
-
-                            byte[] buffer = new byte[currentChunkSize];
-                            binaryReader.BaseStream.Seek(l, SeekOrigin.Begin);
-                            binaryReader.Read(buffer, 0, (int)currentChunkSize);
-
-                            byte[] hashBytes = SHA256.Create().ComputeHash(buffer);
-                            newChunk.Hash = Convert.ToBase64String(hashBytes);
-
-                            manifest.Chunks.Add(newChunk);
-
-                            PutObjectRequest chunkRequest = new PutObjectRequest()
-                            {
-                                Particle = newChunk.Id.ToString(),
-                                DataStream = new MemoryStream(buffer),
-                                Server = request.Server,
-                                Routing = request.Routing,
-                                RequestResult = new ResultDelegate(HandleChunkPutComplete),
-                                DelegateTag = newChunk.Id.ToString()
-                            };
-                            if (request.PolicyClassification != null)
-                            {
-                                chunkRequest.PolicyClassification = request.PolicyClassification;
-                            }
-                            else
-                            {
-                                chunkRequest.PolicyClassificationId = request.PolicyClassificationId;
-                            }
-                            _ = InvokeChunkPut(chunkRequest);
-                            chunkRequest.DataStream.Dispose();
-                            buffer = null;
-                            i++;
                         }
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Exception chunking data and making PUT requests: {e.Message}");
+                        result.StatusCode = 99;
+                        result.StatusMessage = $"Exception chunking data and making PUT requests: {e.Message}";
+                        waitForPuts = false;
                     }
 
                     int stopCounter = 0;
-                    while (_putResultCollection.Count < chunks && stopCounter++ < 1000000)
+                    while (waitForPuts && _putResultCollection.Count < chunks && stopCounter++ < 1000000)
                     {
                         await Task.Delay(5);
                     }
@@ -575,6 +582,7 @@ namespace Ionburst.SDK
                                 {
                                     // Failed
                                     result.StatusCode = chunkResult.PutResult.StatusCode;
+                                    result.StatusMessage = chunkResult.PutResult.StatusMessage;
                                     if (result.StatusCode == 429)
                                     {
                                         result.StatusMessage = "Manifiest processing halted by rate limiting";
@@ -616,7 +624,7 @@ namespace Ionburst.SDK
                                 Server = request.Server,
                                 Routing = request.Routing
                             };
-                            if (request.PolicyClassification != null)
+                            if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
                             {
                                 manifestRequest.PolicyClassification = request.PolicyClassification;
                             }
