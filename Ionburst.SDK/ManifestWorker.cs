@@ -494,56 +494,53 @@ namespace Ionburst.SDK
                     bool waitForPuts = true;
                     try
                     {
-                        using (BinaryReader binaryReader = new BinaryReader(request.DataStream))
+                        int i = 0;
+                        for (long l = 0; l < inputSize; l += offset)
                         {
-                            int i = 0;
-                            for (long l = 0; l < inputSize; l += offset)
+                            long boundary = l + offset;
+                            if (boundary > inputSize)
                             {
-                                long boundary = l + offset;
-                                if (boundary > inputSize)
-                                {
-                                    boundary = inputSize;
-                                }
-                                long currentChunkSize = boundary - l;
-
-                                IonburstChunk newChunk = new IonburstChunk()
-                                {
-                                    Ord = i + 1
-                                };
-
-                                byte[] buffer = new byte[currentChunkSize];
-                                binaryReader.BaseStream.Seek(l, SeekOrigin.Begin);
-                                binaryReader.Read(buffer, 0, (int)currentChunkSize);
-
-                                byte[] hashBytes = SHA256.Create().ComputeHash(buffer);
-                                newChunk.Hash = Convert.ToBase64String(hashBytes);
-
-                                manifest.Chunks.Add(newChunk);
-
-                                PutObjectRequest chunkRequest = new PutObjectRequest()
-                                {
-                                    Particle = newChunk.Id.ToString(),
-                                    DataStream = new MemoryStream(buffer),
-                                    Server = request.Server,
-                                    Routing = request.Routing,
-                                    RequestResult = new ResultDelegate(HandleChunkPutComplete),
-                                    DelegateTag = newChunk.Id.ToString(),
-                                    RequestTimeout = new TimeSpan(0, 5, 0),
-                                    TimeoutSpecified = true
-                                };
-                                if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
-                                {
-                                    chunkRequest.PolicyClassification = request.PolicyClassification;
-                                }
-                                else
-                                {
-                                    chunkRequest.PolicyClassificationId = request.PolicyClassificationId;
-                                }
-                                _ = InvokeChunkPut(chunkRequest);
-                                chunkRequest.DataStream.Dispose();
-                                buffer = null;
-                                i++;
+                                boundary = inputSize;
                             }
+                            long currentChunkSize = boundary - l;
+
+                            IonburstChunk newChunk = new IonburstChunk()
+                            {
+                                Ord = i + 1
+                            };
+
+                            byte[] buffer = new byte[currentChunkSize];
+                            request.DataStream.Seek(l, SeekOrigin.Begin);
+                            await request.DataStream.ReadAsync(buffer, 0, (int)currentChunkSize);
+
+                            byte[] hashBytes = SHA256.Create().ComputeHash(buffer);
+                            newChunk.Hash = Convert.ToBase64String(hashBytes);
+
+                            manifest.Chunks.Add(newChunk);
+
+                            PutObjectRequest chunkRequest = new PutObjectRequest()
+                            {
+                                Particle = newChunk.Id.ToString(),
+                                DataStream = new MemoryStream(buffer),
+                                Server = request.Server,
+                                Routing = request.Routing,
+                                RequestResult = new ResultDelegate(HandleChunkPutComplete),
+                                DelegateTag = newChunk.Id.ToString(),
+                                RequestTimeout = new TimeSpan(0, 5, 0),
+                                TimeoutSpecified = true
+                            };
+                            if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
+                            {
+                                chunkRequest.PolicyClassification = request.PolicyClassification;
+                            }
+                            else
+                            {
+                                chunkRequest.PolicyClassificationId = request.PolicyClassificationId;
+                            }
+                            _ = InvokeChunkPut(chunkRequest);
+                            chunkRequest.DataStream.Dispose();
+                            buffer = null;
+                            i++;
                         }
                     }
                     catch (Exception e)
