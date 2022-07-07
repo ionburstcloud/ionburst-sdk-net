@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.7
+2022-07-07
+
+### Fixes
+
+- option to record put manifest and speculative stream changes (457e2b2ed4f77fd9a66eeaa40a9b6af076890764)
+
 ## 1.3.0-develop.6
 2022-07-06
 
