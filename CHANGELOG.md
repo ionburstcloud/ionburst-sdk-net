@@ -2,6 +2,15 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.9
+2022-07-07
+
+### Fixes
+
+- option to record put manifest and speculative stream changes (457e2b2ed4f77fd9a66eeaa40a9b6af076890764)
+- trying a larger size with steam copy calls (5976590d4b96cc8c5049e4cc929a869a8f2b00e9)
+- forgot to calculate hash of original object (8acbd28c41cc4ded3c441c52f597ffed130ee51e)
+
 ## 1.3.0-develop.8
 2022-07-07
 
