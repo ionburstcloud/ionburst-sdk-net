@@ -372,8 +372,21 @@ namespace Ionburst.SDK
                                 result.DataStream = new MemoryStream();
                                 objectStream.Seek(0, SeekOrigin.Begin);
                                 await objectStream.CopyToAsync(result.DataStream, 524288);
+
+                                // Check the hash
                                 result.DataStream.Seek(0, SeekOrigin.Begin);
-                                result.StatusCode = 200;
+                                byte[] hashInputBytes = SHA256.Create().ComputeHash(result.DataStream);
+                                string hash = Convert.ToBase64String(hashInputBytes);
+                                if (hash == ionburstManifest.Hash)
+                                {
+                                    result.DataStream.Seek(0, SeekOrigin.Begin);
+                                    result.StatusCode = 200;
+                                }
+                                else
+                                {
+                                    result.StatusCode = 500;
+                                    result.StatusMessage = "Reconstructed object hash does not match original hash";
+                                }
                             }
                             else
                             {
@@ -476,13 +489,16 @@ namespace Ionburst.SDK
                     long offset = request.ChunkSize;
                     long chunks = (inputSize / offset) + (inputSize % offset > 0 ? 1 : 0);
 
+                    byte[] hashInputBytes = SHA256.Create().ComputeHash(request.DataStream);
+
                     // Create the manifest
                     IonburstManifest manifest = new IonburstManifest()
                     {
                         Name = request.Particle,
                         Size = inputSize,
                         ChunkCount = chunks,
-                        ChunkSize = offset
+                        ChunkSize = offset,
+                        Hash = Convert.ToBase64String(hashInputBytes)
                     };
 
                     bool waitForPuts = true;
@@ -516,8 +532,8 @@ namespace Ionburst.SDK
                                 bytesCopied += await request.DataStream.ReadAsync(buffer, bytesCopied, copySize);
                             }
 
-                            byte[] hashBytes = SHA256.Create().ComputeHash(buffer);
-                            newChunk.Hash = Convert.ToBase64String(hashBytes);
+                            byte[] hashChunkBytes = SHA256.Create().ComputeHash(buffer);
+                            newChunk.Hash = Convert.ToBase64String(hashChunkBytes);
 
                             manifest.Chunks.Add(newChunk);
 
