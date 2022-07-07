@@ -1282,7 +1282,7 @@ namespace Ionburst.SDK
             {
                 using (MemoryStream ms = new MemoryStream())
                 {
-                    await content.CopyToAsync(ms, 65536);
+                    await content.CopyToAsync(ms, 524288);
                     return await Task.FromResult(new ByteArrayContent(ms.ToArray()));
                 }
             }

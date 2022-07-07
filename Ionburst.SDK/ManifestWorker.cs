@@ -360,7 +360,7 @@ namespace Ionburst.SDK
                                 {
                                     GetManifestChunk getChunkResult = resultCollection.First(cr => cr.Chunk.Ord == i + 1);
                                     getChunkResult.GetResult.DataStream.Seek(0, SeekOrigin.Begin);
-                                    await getChunkResult.GetResult.DataStream.CopyToAsync(objectStream, 65536);
+                                    await getChunkResult.GetResult.DataStream.CopyToAsync(objectStream, 524288);
                                 }
                                 foreach (GetManifestChunk getChunkResult in resultCollection)
                                 {
@@ -371,7 +371,7 @@ namespace Ionburst.SDK
                                 // The object stream is going to be disposed outside this scope so SDK client gets a copy to handle
                                 result.DataStream = new MemoryStream();
                                 objectStream.Seek(0, SeekOrigin.Begin);
-                                await objectStream.CopyToAsync(result.DataStream, 65536);
+                                await objectStream.CopyToAsync(result.DataStream, 524288);
                                 result.DataStream.Seek(0, SeekOrigin.Begin);
                                 result.StatusCode = 200;
                             }
@@ -508,7 +508,7 @@ namespace Ionburst.SDK
                             int bytesCopied = 0;
                             while (bytesCopied < currentChunkSize)
                             {
-                                int copySize = 65536;
+                                int copySize = 524288;
                                 if (currentChunkSize - bytesCopied < copySize)
                                 {
                                     copySize = Convert.ToInt32(currentChunkSize - bytesCopied);
