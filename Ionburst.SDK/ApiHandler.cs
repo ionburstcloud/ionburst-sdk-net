@@ -1232,13 +1232,13 @@ namespace Ionburst.SDK
         private async Task<DeleteManifestResult> ProcessDeleteManifestRequest(DeleteManifestRequest request)
         {
 
-            using ManifestWorker manifestWorker = new ManifestWorker(this, _server, _dataPath, _secretsPath);
+            using ManifestWorker manifestWorker = new ManifestWorker(this, _settings, _server, _dataPath, _secretsPath);
             return await manifestWorker.ProcessDeleteManifestRequest(request);
         }
 
         private async Task<GetManifestResult> ProcessGetManifestRequest(GetManifestRequest request)
         {
-            using ManifestWorker manifestWorker = new ManifestWorker(this, _server, _dataPath, _secretsPath);
+            using ManifestWorker manifestWorker = new ManifestWorker(this, _settings, _server, _dataPath, _secretsPath);
             return await manifestWorker.ProcessGetManifestRequest(request);
         }
 
@@ -1260,7 +1260,7 @@ namespace Ionburst.SDK
                     request.ChunkSize = await GetUploadSizeLimit($"{_server}{_dataPath}query/uploadsizelimit");
                 }
             }
-            using ManifestWorker manifestWorker = new ManifestWorker(this, _server, _dataPath, _secretsPath);
+            using ManifestWorker manifestWorker = new ManifestWorker(this, _settings, _server, _dataPath, _secretsPath);
             return await manifestWorker.ProcessPutManifestRequest(request);
         }
 
@@ -1282,7 +1282,7 @@ namespace Ionburst.SDK
             {
                 using (MemoryStream ms = new MemoryStream())
                 {
-                    await content.CopyToAsync(ms);
+                    await content.CopyToAsync(ms, 65536);
                     return await Task.FromResult(new ByteArrayContent(ms.ToArray()));
                 }
             }

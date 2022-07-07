@@ -55,6 +55,7 @@ namespace Ionburst.SDK
     public class ManifestWorker : IDisposable
     {
         private readonly ApiHandler _apiHandler;
+        private readonly IonburstSDKSettings _settings;
         private readonly string _server;
         private readonly string _dataPath;
         private readonly string _secretsPath;
@@ -63,9 +64,10 @@ namespace Ionburst.SDK
 
         private readonly ConcurrentBag<PutManifestChunk> _putResultCollection = new ConcurrentBag<PutManifestChunk>();
 
-        public ManifestWorker(ApiHandler apiHandler, string server, string dataPath, string secretsPath)
+        public ManifestWorker(ApiHandler apiHandler, IonburstSDKSettings settings, string server, string dataPath, string secretsPath)
         {
             _apiHandler = apiHandler;
+            _settings = settings;
             _server = server;
             _dataPath = dataPath;
             _secretsPath = secretsPath;
@@ -127,8 +129,7 @@ namespace Ionburst.SDK
                                     Server = request.Server,
                                     Routing = request.Routing
                                 };
-                                DeleteObjectResult manifestDeleteResult = await _apiHandler.ProcessRequest(manifestDeleteRequest) as DeleteObjectResult;
-                                if (manifestDeleteResult != null)
+                                if (await _apiHandler.ProcessRequest(manifestDeleteRequest) is DeleteObjectResult manifestDeleteResult)
                                 {
                                     result.ActivityToken = manifestDeleteResult.ActivityToken;
                                     if (manifestDeleteResult.StatusCode == 200 || manifestDeleteResult.StatusCode == 204 || manifestDeleteResult.StatusCode == 404)
@@ -276,8 +277,7 @@ namespace Ionburst.SDK
                     Server = request.Server,
                     Routing = request.Routing
                 };
-                GetObjectResult manifestResult = await _apiHandler.ProcessRequest(manifestRequest) as GetObjectResult;
-                if (manifestResult != null)
+                if (await _apiHandler.ProcessRequest(manifestRequest) is GetObjectResult manifestResult)
                 {
                     result.ActivityToken = manifestResult.ActivityToken;
                     if (manifestResult.StatusCode == 200)
@@ -355,17 +355,12 @@ namespace Ionburst.SDK
                             if (!getFailed)
                             {
                                 using MemoryStream objectStream = new MemoryStream();
-                                /*foreach (GetManifestChunk getChunkResult in resultCollection)
-                                {
-                                    getChunkResult.GetResult.DataStream.Seek(0, SeekOrigin.Begin);
-                                    getChunkResult.GetResult.DataStream.CopyTo(objectStream);
-                                }*/
                                 // Who knows what order the chunks in ConcurrentBag will be
                                 for (int i = 0; i < resultCollection.Count; i++)
                                 {
                                     GetManifestChunk getChunkResult = resultCollection.First(cr => cr.Chunk.Ord == i + 1);
                                     getChunkResult.GetResult.DataStream.Seek(0, SeekOrigin.Begin);
-                                    await getChunkResult.GetResult.DataStream.CopyToAsync(objectStream);
+                                    await getChunkResult.GetResult.DataStream.CopyToAsync(objectStream, 65536);
                                 }
                                 foreach (GetManifestChunk getChunkResult in resultCollection)
                                 {
@@ -373,10 +368,10 @@ namespace Ionburst.SDK
                                     getChunkResult.GetResult.DataStream = null;
                                 }
 
-                                // The object stream is going to be disposed outside this scope so SDL client gets a copy to handle
+                                // The object stream is going to be disposed outside this scope so SDK client gets a copy to handle
                                 result.DataStream = new MemoryStream();
                                 objectStream.Seek(0, SeekOrigin.Begin);
-                                await objectStream.CopyToAsync(result.DataStream);
+                                await objectStream.CopyToAsync(result.DataStream, 65536);
                                 result.DataStream.Seek(0, SeekOrigin.Begin);
                                 result.StatusCode = 200;
                             }
@@ -474,8 +469,7 @@ namespace Ionburst.SDK
                     Server = request.Server,
                     Routing = request.Routing
                 };
-                CheckObjectResult checkResult = await _apiHandler.ProcessRequest(checkRequest) as CheckObjectResult;
-                if (checkResult != null && checkResult.StatusCode != 200)
+                if (await _apiHandler.ProcessRequest(checkRequest) is CheckObjectResult checkResult && checkResult.StatusCode != 200)
                 {
                     // Do initial chunking calculations
                     long inputSize = request.DataStream.Length;
@@ -511,7 +505,16 @@ namespace Ionburst.SDK
 
                             byte[] buffer = new byte[currentChunkSize];
                             request.DataStream.Seek(l, SeekOrigin.Begin);
-                            await request.DataStream.ReadAsync(buffer, 0, (int)currentChunkSize);
+                            int bytesCopied = 0;
+                            while (bytesCopied < currentChunkSize)
+                            {
+                                int copySize = 65536;
+                                if (currentChunkSize - bytesCopied < copySize)
+                                {
+                                    copySize = Convert.ToInt32(currentChunkSize - bytesCopied);
+                                }
+                                bytesCopied += await request.DataStream.ReadAsync(buffer, bytesCopied, copySize);
+                            }
 
                             byte[] hashBytes = SHA256.Create().ComputeHash(buffer);
                             newChunk.Hash = Convert.ToBase64String(hashBytes);
@@ -558,16 +561,6 @@ namespace Ionburst.SDK
                     }
 
                     // Check the chunk put results
-                    /*Parallel.ForEach(putChunkResults, i =>
-                    {
-                        i.StatusCode = i.PutResult.StatusCode;
-                        i.StatusMessage = i.PutResult.StatusMessage;
-                    });*/
-                    /*foreach (PutManifestChunk chunkResult in putChunkResults)
-                    {
-                        chunkResult.StatusCode = chunkResult.PutResult.StatusCode;
-                        chunkResult.StatusMessage = chunkResult.PutResult.StatusMessage;
-                    }*/
                     if (_putResultCollection.Count == chunks)
                     {
                         foreach (PutManifestChunk chunkResult in _putResultCollection)
@@ -607,6 +600,22 @@ namespace Ionburst.SDK
                         result.StatusMessage = "Failed to store all chunks";
                     }
 
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(_settings.ManifestCaptureDir))
+                        {
+                            // If config asks, capture the manifest as a local file
+                            string serializedManifest = JsonConvert.SerializeObject(manifest);
+                            string captureFile= Path.Combine(_settings.ManifestCaptureDir, request.Particle.ToString());
+                            using FileStream mf = new FileStream(captureFile, FileMode.Create);
+                            await mf.WriteAsync(Encoding.Default.GetBytes(serializedManifest));
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        // Optional feature, so is it very important if this failed?
+                    }
+
                     if (result.StatusCode == 0)
                     {
                         // Store the manifest
@@ -629,8 +638,7 @@ namespace Ionburst.SDK
                             {
                                 manifestRequest.PolicyClassificationId = request.PolicyClassificationId;
                             }
-                            PutObjectResult manifestResult = await _apiHandler.ProcessRequest(manifestRequest) as PutObjectResult;
-                            if (manifestResult != null)
+                            if (await _apiHandler.ProcessRequest(manifestRequest) is PutObjectResult manifestResult)
                             {
                                 result.ActivityToken = manifestResult.ActivityToken;
                                 if (manifestResult.StatusCode == 200)
@@ -681,8 +689,10 @@ namespace Ionburst.SDK
 
         private void HandleChunkPutComplete(IObjectResult result)
         {
-            PutManifestChunk manifestChunkResult = new PutManifestChunk();
-            manifestChunkResult.PutResult = result as PutObjectResult;
+            PutManifestChunk manifestChunkResult = new PutManifestChunk()
+            {
+                PutResult = result as PutObjectResult
+            };
             manifestChunkResult.StatusCode = manifestChunkResult.PutResult.StatusCode;
             manifestChunkResult.StatusMessage = manifestChunkResult.PutResult.StatusMessage;
             _putResultCollection.Add(manifestChunkResult);    

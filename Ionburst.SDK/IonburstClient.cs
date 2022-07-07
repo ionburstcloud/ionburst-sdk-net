@@ -586,7 +586,7 @@ namespace Ionburst.SDK
             {
                 getResult.DataStream.Seek(0, SeekOrigin.Begin);
                 MemoryStream ms = new MemoryStream();
-                await getResult.DataStream.CopyToAsync(ms);
+                await getResult.DataStream.CopyToAsync(ms, 65536);
                 ms.Seek(0, SeekOrigin.Begin);
                 request.DataStream = ms;
 

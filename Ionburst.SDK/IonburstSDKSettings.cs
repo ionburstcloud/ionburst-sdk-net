@@ -24,6 +24,8 @@ namespace Ionburst.SDK
         public long DefaultChunkSize { get; set; }
         public string ProfilesLocation { get; set; }
         public IConfiguration ExternalConfiguration { get; set; }
+        public string ManifestCaptureDir { get; set; }
+
         private IConfiguration _configuration { get; set; }
 
         public IonburstSDKSettings(bool usingBuilder = false)
@@ -133,6 +135,8 @@ namespace Ionburst.SDK
                     }
                 }
             }
+
+            ManifestCaptureDir = _configuration["Ionburst:ManifestCaptureDir"];
 
             CredentialsSet = false;
             EstablishCredentials(_configuration);
