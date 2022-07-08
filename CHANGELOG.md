@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.10
+2022-07-08
+
+### Fixes
+
+- forget to set MaxSize attribute in manifest class (948202ee7fedfa78e6f06440756941a14c60e078)
+
 ## 1.3.0-develop.9
 2022-07-07
 
