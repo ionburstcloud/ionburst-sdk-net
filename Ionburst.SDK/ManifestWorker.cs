@@ -498,6 +498,7 @@ namespace Ionburst.SDK
                         Size = inputSize,
                         ChunkCount = chunks,
                         ChunkSize = offset,
+                        MaxSize = dataLimit,
                         Hash = Convert.ToBase64String(hashInputBytes)
                     };
 
