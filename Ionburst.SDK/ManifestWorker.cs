@@ -489,6 +489,8 @@ namespace Ionburst.SDK
                     long offset = request.ChunkSize;
                     long chunks = (inputSize / offset) + (inputSize % offset > 0 ? 1 : 0);
 
+                    // Put stream at start before taking hash
+                    request.DataStream.Seek(0, SeekOrigin.Begin);
                     byte[] hashInputBytes = SHA256.Create().ComputeHash(request.DataStream);
 
                     // Create the manifest
