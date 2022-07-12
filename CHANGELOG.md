@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.12
+2022-07-12
+
+### Fixes
+
+- added extension to add IonburstClient to .NET DI framework (8d9a5a795fb2673d0162fa230735c6a3bc60f567)
+
 ## 1.3.0-develop.11
 2022-07-11
 
