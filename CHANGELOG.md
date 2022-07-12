@@ -2,6 +2,13 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.11
+2022-07-11
+
+### Fixes
+
+- added stream repositioning to put manifest function (d1523bc3e79b69d34f1fd4a6ead86d1b42276e78)
+
 ## 1.3.0-develop.10
 2022-07-08
 
