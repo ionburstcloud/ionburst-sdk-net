@@ -8,9 +8,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.IO;
 using System.Security.Cryptography;
+using System.Linq;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using Ionburst.SDK.Contracts;
 using Ionburst.SDK.Model;
 using Ionburst.Api.Model;
 
@@ -20,9 +22,13 @@ namespace Ionburst.SDK
 {
     public class ApiHandler
     {
-        private IHttpClientFactory _httpClientFactory = null;
-        private IonburstSDKSettings _settings = null;
-        private JwtRequest _jwtRequest = null;
+        private readonly IHttpClientFactory _httpClientFactory = null;
+        private readonly IonburstSDKSettings _settings = null;
+        private readonly JwtRequest _jwtRequest = null;
+        private readonly string _server;
+        private readonly string _dataPath;
+        private readonly string _secretsPath;
+
         private object _jwtLock = new object();
 
         internal class DeferredResult
@@ -36,7 +42,7 @@ namespace Ionburst.SDK
             public string label { get; set; }
         }
 
-        internal ApiHandler(IonburstSDKSettings settings, JwtRequest jwtRequest)
+        internal ApiHandler(IonburstSDKSettings settings, JwtRequest jwtRequest, string server, string dataPath, string secretsPath)
         {
             IServiceCollection serviceCollection = new ServiceCollection();
             serviceCollection.AddHttpClient();
@@ -44,34 +50,67 @@ namespace Ionburst.SDK
             _httpClientFactory = serviceProvider.GetService<IHttpClientFactory>();
             _settings = settings;
             _jwtRequest = jwtRequest;
+            _server = server;
+            _dataPath = dataPath;
+            _secretsPath = secretsPath;
         }
 
         internal async Task<ObjectResult> ProcessRequest(ObjectRequest request)
         {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            if (request is CheckObjectRequest checkRequest)
+            {
+                return await ProcessCheckRequest(checkRequest);
+            }
             if (request is DeleteObjectRequest deleteRequest)
             {
-                return await ProcessDeleteRequest(deleteRequest);
-            }
-            else if (request is GetObjectRequest getRequest)
-            {
-                if (getRequest.PhasedMode)
+                if (request is DeleteManifestRequest deleteManifestRequest)
                 {
-                    return await ProcessPhasedGetRequest(getRequest);
+                    return await ProcessDeleteManifestRequest(deleteManifestRequest);
                 }
                 else
                 {
-                    return await ProcessGetRequest(getRequest);
+                    return await ProcessDeleteRequest(deleteRequest);
+                }
+            }
+            else if (request is GetObjectRequest getRequest)
+            {
+                if (request is GetManifestRequest getManifestRequest)
+                {
+                    return await ProcessGetManifestRequest(getManifestRequest);
+                }
+                else
+                {
+                    if (getRequest.PhasedMode)
+                    {
+                        return await ProcessPhasedGetRequest(getRequest);
+                    }
+                    else
+                    {
+                        return await ProcessGetRequest(getRequest);
+                    }
                 }
             }
             else if (request is PutObjectRequest putRequest)
             {
-                if (putRequest.PhasedMode)
+                if (request is PutManifestRequest putManifestRequest)
                 {
-                    return await ProcessPhasedPutRequest(putRequest);
+                    return await ProcessPutManifestRequest(putManifestRequest);
                 }
                 else
                 {
-                    return await ProcessPutRequest(putRequest);
+                    if (putRequest.PhasedMode)
+                    {
+                        return await ProcessPhasedPutRequest(putRequest);
+                    }
+                    else
+                    {
+                        return await ProcessPutRequest(putRequest);
+                    }
                 }
             }
             else if (request is GetPolicyClassificationRequest classRequest)
@@ -82,6 +121,87 @@ namespace Ionburst.SDK
             {
                 return null;
             }
+        }
+
+        private async Task<CheckObjectResult> ProcessCheckRequest(CheckObjectRequest request)
+        {
+            CheckObjectResult result = new CheckObjectResult();
+
+            try
+            {
+                string requestUriString = $"{request.Server}{request.Routing}";
+                if (requestUriString == string.Empty || requestUriString == null)
+                {
+                    result.StatusCode = 400;
+                }
+                else
+                {
+                    string requestString = $"{requestUriString}{request.Particle}";
+                    Uri requestUri = new Uri(requestString);
+                    using (HttpClient headClient = _httpClientFactory.CreateClient("HEADClient"))
+                    {
+                        if (request.TimeoutSpecified)
+                        {
+                            headClient.Timeout = request.RequestTimeout;
+                        }
+                        bool makeRequest = true;
+                        int requestCount = 0;
+                        while (makeRequest)
+                        {
+                            if (_settings.JWT != string.Empty)
+                            {
+                                headClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.JWT);
+                            }
+
+                            HttpRequestMessage referenceRequest = new HttpRequestMessage
+                            {
+                                Method = HttpMethod.Head,
+                                RequestUri = new Uri(requestString)
+                            };
+                            makeRequest = false;
+                            HttpResponseMessage headResponse = await headClient.SendAsync(referenceRequest);
+                            requestCount++;
+                            result.StatusCode = Convert.ToInt32(headResponse.StatusCode);
+                            if (headResponse.StatusCode == System.Net.HttpStatusCode.OK)
+                            {
+                                long objectSize = Convert.ToInt64(headResponse.Headers.GetValues("x-original-length").First());
+                                result.ObjectSize = objectSize;
+                            }
+                            else if (headResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                            {
+                                // Possible that JWT has expired
+                                if (_settings.JWTAssigned)
+                                {
+                                    // Had one before so refresh and try again. Once.
+                                    if (requestCount < 2)
+                                    {
+                                        RefreshJWT();
+                                        makeRequest = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (WebException e)
+            {
+                result.StatusCode = 500;
+                if (e.Response != null)
+                {
+                    using (StreamReader reader = new StreamReader(e.Response.GetResponseStream()))
+                    {
+                        result.StatusMessage = await reader.ReadToEndAsync();
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                result.StatusCode = 99;
+                result.StatusMessage = $"SDK exception: {e.Message}";
+            }
+
+            return await Task.FromResult(result);
         }
 
         private async Task<DeleteObjectResult> ProcessDeleteRequest(DeleteObjectRequest request)
@@ -99,7 +219,7 @@ namespace Ionburst.SDK
                 {
                     string requestString = $"{requestUriString}{request.Particle}";
                     Uri requestUri = new Uri(requestString);
-                    using (HttpClient deleteClient = _httpClientFactory.CreateClient())
+                    using (HttpClient deleteClient = _httpClientFactory.CreateClient("DELETEClient"))
                     {
                         if (request.TimeoutSpecified)
                         {
@@ -149,7 +269,14 @@ namespace Ionburst.SDK
                                 if (result.StatusCode == 429)
                                 {
                                     // Rate limiter has steppeed in
-                                    result.StatusMessage = await deleteResponse.Content.ReadAsStringAsync();
+                                    try
+                                    {
+                                        result.StatusMessage = await deleteResponse.Content.ReadAsStringAsync();
+                                    }
+                                    catch (Exception)
+                                    {
+                                        result.StatusMessage = "Request has been rate limited";
+                                    }
                                 }
                                 else
                                 {
@@ -163,7 +290,14 @@ namespace Ionburst.SDK
                                     catch
                                     {
                                         // Just put in the result content
-                                        result.StatusMessage = await deleteResponse.Content.ReadAsStringAsync();
+                                        try
+                                        {
+                                            result.StatusMessage = await deleteResponse.Content.ReadAsStringAsync();
+                                        }
+                                        catch
+                                        {
+                                            result.StatusMessage = "API response in unexpected format";
+                                        }
                                     }
                                 }
                             }
@@ -188,7 +322,7 @@ namespace Ionburst.SDK
                 result.StatusMessage = $"SDK exception: {e.Message}";
             }
 
-            return result;
+            return await Task.FromResult(result);
         }
 
         private async Task<GetObjectResult> ProcessGetRequest(GetObjectRequest request)
@@ -210,7 +344,7 @@ namespace Ionburst.SDK
                         requestString = $"{requestUriString}deferred/fetch/{request.DeferredToken}";
                     }
                     Uri requestUri = new Uri(requestString);
-                    using (HttpClient getClient = _httpClientFactory.CreateClient())
+                    using (HttpClient getClient = _httpClientFactory.CreateClient("GETClient"))
                     {
                         if (request.TimeoutSpecified)
                         {
@@ -278,7 +412,14 @@ namespace Ionburst.SDK
                                 if (result.StatusCode == 429)
                                 {
                                     // Rate limiter has steppeed in
-                                    result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                    try
+                                    {
+                                        result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                    }
+                                    catch
+                                    {
+                                        result.StatusMessage = "Request has been rate limited";
+                                    }
                                 }
                                 else
                                 {
@@ -292,7 +433,14 @@ namespace Ionburst.SDK
                                     catch
                                     {
                                         // Just put in the result content
-                                        result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                        try
+                                        {
+                                            result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                        }
+                                        catch
+                                        {
+                                            result.StatusMessage = "API response in unexpected formart";
+                                        }
                                     }
                                 }
                             }
@@ -317,7 +465,7 @@ namespace Ionburst.SDK
                 result.StatusMessage = $"SDK exception: {e.Message}";
             }
 
-            return result;
+            return await Task.FromResult(result);
         }
 
         private async Task<GetObjectResult> ProcessPhasedGetRequest(GetObjectRequest request)
@@ -411,7 +559,7 @@ namespace Ionburst.SDK
                 result.StatusMessage = $"SDK exception: {e.Message}";
             }
 
-            return result;
+            return await Task.FromResult(result);
         }
 
         internal async Task<DeferredResponse> InitiateDeferredGet(GetObjectRequest request)
@@ -425,7 +573,7 @@ namespace Ionburst.SDK
                 {
                     string requestString = $"{requestUriString}deferred/start/{request.Particle}";
                     Uri requestUri = new Uri(requestString);
-                    using (HttpClient getClient = _httpClientFactory.CreateClient())
+                    using (HttpClient getClient = _httpClientFactory.CreateClient("DeferredGETClient"))
                     {
                         if (request.TimeoutSpecified)
                         {
@@ -472,14 +620,14 @@ namespace Ionburst.SDK
                                     }
                                     else
                                     {
-                                        response.Status = (int)getResponse.StatusCode;
+                                        response.Status = Convert.ToInt32(getResponse.StatusCode);
                                     }
                                 }
                             }
                             else
                             {
                                 // Not Ok
-                                response.Status = (int)getResponse.StatusCode;
+                                response.Status = Convert.ToInt32(getResponse.StatusCode);
                             }
                         }
                     }
@@ -492,7 +640,7 @@ namespace Ionburst.SDK
             {
             }
 
-            return response;
+            return await Task.FromResult(response);
         }
 
         internal async Task<DeferredCheckResult> DeferredRequestCheck(ObjectRequest request)
@@ -510,7 +658,7 @@ namespace Ionburst.SDK
                 {
                     string requestString = $"{requestUriString}deferred/check/{deferredToken}";
                     Uri requestUri = new Uri(requestString);
-                    using (HttpClient getClient = _httpClientFactory.CreateClient())
+                    using (HttpClient getClient = _httpClientFactory.CreateClient("DeferredCheckClient"))
                     {
                         if (request.TimeoutSpecified)
                         {
@@ -543,7 +691,14 @@ namespace Ionburst.SDK
                                 catch (Exception)
                                 {
                                     checkResult.StatusCode = 500;
-                                    checkResult.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                    try
+                                    {
+                                        checkResult.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                    }
+                                    catch
+                                    {
+                                        checkResult.StatusMessage = "API response in unexpected format";
+                                    }
                                 }
                             }
                             else if (getResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
@@ -576,7 +731,14 @@ namespace Ionburst.SDK
                                     }
                                     catch (Exception)
                                     {
-                                        checkResult.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                        try
+                                        {
+                                            checkResult.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                        }
+                                        catch
+                                        {
+                                            checkResult.StatusMessage = "API respomse in unexpected format";
+                                        }
                                     }
                                 }
                             }
@@ -601,7 +763,7 @@ namespace Ionburst.SDK
                 checkResult.StatusMessage = $"SDK exception: {e.Message}";
             }
 
-            return checkResult;
+            return await Task.FromResult(checkResult);
         }
 
         private async Task<PutObjectResult> ProcessPutRequest(PutObjectRequest request)
@@ -619,10 +781,6 @@ namespace Ionburst.SDK
                 {
                     if (request.DataStream.Length > 0)
                     {
-                        request.DataStream.Position = request.StreamPosition;
-                        // Can't put stream in using {} or it will be disposed before use
-                        StreamContent sendData = new StreamContent(request.DataStream);
-                        sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                         string requestString = $"{requestUriString}{request.Particle}";
                         if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
                         {
@@ -632,9 +790,8 @@ namespace Ionburst.SDK
                         {
                             requestString = $"{requestString}?classid={request.PolicyClassificationId}";
                         }
-
                         Uri requestUri = new Uri(requestString);
-                        using (HttpClient putClient = _httpClientFactory.CreateClient())
+                        using (HttpClient putClient = _httpClientFactory.CreateClient($"POSTClient"))
                         {
                             if (request.TimeoutSpecified)
                             {
@@ -648,69 +805,146 @@ namespace Ionburst.SDK
                                 {
                                     putClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.JWT);
                                 }
-
-                                makeRequest = false;
-                                HttpResponseMessage putResponse = await putClient.PutAsync(requestUri, sendData);
-                                requestCount++;
-                                result.StatusCode = Convert.ToInt32(putResponse.StatusCode);
-                                if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
+                                // Postman default headers
+                                //putClient.DefaultRequestHeaders.Add("Accept", "*/*");
+                                //putClient.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
+                                //putClient.DefaultRequestHeaders.Add("Connection", "keep-alive");
+                                //putClient.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
+                                if (request.DataStream.Position != request.StreamPosition)
                                 {
-                                    // Success
+                                    request.DataStream.Seek(request.StreamPosition, SeekOrigin.Begin);
+                                }
+
+                                ByteArrayContent sendData = await MakeByteArrayContent(request.DataStream);
+                                if (sendData != null)
+                                {
+                                    sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+
+                                    makeRequest = false;
                                     try
                                     {
-                                        IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(await putResponse.Content.ReadAsStringAsync());
-                                        result.ActivityToken = output.ActivityToken;
+                                        HttpResponseMessage putResponse = await putClient.PostAsync(requestUri, sendData);
+                                        requestCount++;
+                                        result.StatusCode = Convert.ToInt32(putResponse.StatusCode);
+                                        if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
+                                        {
+                                            // Success
+                                            try
+                                            {
+                                                IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(await putResponse.Content.ReadAsStringAsync());
+                                                result.ActivityToken = output.ActivityToken;
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                result.StatusMessage = $"SDK exception handling PUT response content: {e.Message}";
+                                            }
+                                        }
+                                        else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                                        {
+                                            // Possible that JWT has expired
+                                            if (_settings.JWTAssigned)
+                                            {
+                                                // Had one before so refresh and try again. Once.
+                                                if (requestCount < 2)
+                                                {
+                                                    RefreshJWT();
+                                                    makeRequest = true;
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // Not Ok
+                                            if (result.StatusCode == 429)
+                                            {
+                                                // Rate limiter has stepped in
+                                                try
+                                                {
+                                                    result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
+                                                }
+                                                catch (Exception)
+                                                {
+                                                    result.StatusMessage = "Request has been rate limited";
+                                                }
+                                            }
+                                            else if (result.StatusCode == 413)
+                                            {
+                                                // The web server has rejected fot being too large
+                                                try
+                                                {
+                                                    string apiOutput = await putResponse.Content.ReadAsStringAsync();
+                                                    try
+                                                    {
+                                                        // Might be a workflow result
+                                                        IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(apiOutput);
+                                                        result.ActivityToken = output.ActivityToken;
+                                                        result.StatusMessage = output.Message;
+                                                    }
+                                                    catch (Exception)
+                                                    {
+                                                        result.StatusMessage = "Request data is too large";
+                                                    }
+                                                }
+                                                catch (Exception)
+                                                {
+                                                    result.StatusMessage = "Request data is too large";
+                                                }
+                                            }
+                                            else
+                                            {
+                                                // if a WorkflowResult came back, use that
+                                                try
+                                                {
+                                                    IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(await putResponse.Content.ReadAsStringAsync());
+                                                    result.ActivityToken = output.ActivityToken;
+                                                    result.StatusMessage = output.Message;
+                                                }
+                                                catch
+                                                {
+                                                    // Just put in the result content
+                                                    try
+                                                    {
+                                                        result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
+                                                    }
+                                                    catch (Exception)
+                                                    {
+                                                        result.StatusMessage = "API response not expected format";
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch (HttpRequestException e)
+                                    {
+                                        result.StatusCode = 500;
+                                        result.StatusMessage = $"HTTP request exception: {e.Message}";
+                                    }
+                                    catch (WebException e)
+                                    {
+                                        result.StatusCode = 500;
+                                        result.StatusMessage = $"Web exception calling POST: {e.Message}";
                                     }
                                     catch (Exception e)
                                     {
-                                        result.StatusMessage = $"SDK exception handling PUT response content: {e.Message}";
+                                        result.StatusCode = 99;
+                                        result.StatusMessage = $"SDK exception making calling POST or handling response: {e.Message}";
                                     }
-                                }
-                                else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                                {
-                                    // Possible that JWT has expired
-                                    if (_settings.JWTAssigned)
-                                    {
-                                        // Had one before so refresh and try again. Once.
-                                        if (requestCount < 2)
-                                        {
-                                            RefreshJWT();
-                                            makeRequest = true;
-                                        }
-                                    }
+
+                                    sendData.Dispose();
+                                    request.DataStream.Dispose();
                                 }
                                 else
                                 {
-                                    // Not Ok
-                                    if (result.StatusCode == 429)
-                                    {
-                                        // Rate limiter has steppeed in
-                                        result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
-                                    }
-                                    else
-                                    {
-                                        // if a WorkflowResult came back, use that
-                                        try
-                                        {
-                                            IWorkflowResult output = JsonConvert.DeserializeObject<WorkflowResult>(await putResponse.Content.ReadAsStringAsync());
-                                            result.ActivityToken = output.ActivityToken;
-                                            result.StatusMessage = output.Message;
-                                        }
-                                        catch
-                                        {
-                                            // Just put in the result content
-                                            result.StatusMessage = await putResponse.Content.ReadAsStringAsync();
-                                        }
-                                    }
+                                    result.StatusCode = 99;
+                                    result.StatusMessage = "Failed to create HttpContent for request";
                                 }
                             }
                         }
-                        sendData.Dispose();
                     }
                     else
                     {
                         result.StatusCode = 406;
-                        result.StatusMessage = $"DataStream supplied to SDK has zero length";
+                        result.StatusMessage = "DataStream supplied to SDK has zero length";
                     }
                 }
             }
@@ -731,7 +965,7 @@ namespace Ionburst.SDK
                 result.StatusMessage = $"SDK exception: {e.Message}";
             }
 
-            return result;
+            return await Task.FromResult(result);
         }
 
         private async Task<PutObjectResult> ProcessPhasedPutRequest(PutObjectRequest request)
@@ -803,6 +1037,10 @@ namespace Ionburst.SDK
                     {
                         result.StatusMessage = "Web server throttling has prevented the upload";
                     }
+                    if (string.IsNullOrEmpty(result.StatusMessage))
+                    {
+                        result.StatusMessage = deferredResponse.Message;
+                    }
                 }
             }
             catch (WebException e)
@@ -812,8 +1050,19 @@ namespace Ionburst.SDK
                 {
                     using (StreamReader reader = new StreamReader(e.Response.GetResponseStream()))
                     {
-                        result.StatusMessage = await reader.ReadToEndAsync();
+                        try
+                        {
+                            result.StatusMessage = await reader.ReadToEndAsync();
+                        }
+                        catch
+                        {
+                            result.StatusMessage = e.Message;
+                        }
                     }
+                }
+                else
+                {
+                    result.StatusMessage = e.Message;
                 }
             }
             catch (Exception e)
@@ -822,105 +1071,225 @@ namespace Ionburst.SDK
                 result.StatusMessage = $"SDK exception: {e.Message}";
             }
 
-            return result;
+            return await Task.FromResult(result);
         }
 
         internal async Task<DeferredResponse> InitiateDeferredPut(PutObjectRequest request)
         {
             DeferredResponse response = new DeferredResponse();
 
-            try
+            if (request is PutManifestRequest)
             {
-                string requestUriString = $"{request.Server}{request.Routing}";
-                if (requestUriString != null && requestUriString != string.Empty)
+                // What to do? A manifest involves multiple api calls and workflows but a deferred request is a single workflow
+            }
+            else
+            {
+                try
                 {
-                    if (request.DataStream.Length > 0)
+                    string requestUriString = $"{request.Server}{request.Routing}";
+                    if (requestUriString != null && requestUriString != string.Empty)
                     {
-                        request.DataStream.Position = request.StreamPosition;
-                        // Can't put stream in using {} or it will be disposed before use
-                        StreamContent sendData = new StreamContent(request.DataStream);
-                        sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-
-                        string requestString = $"{requestUriString}deferred/start/{request.Particle}";
-                        if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
+                        if (request.DataStream.Length > 0)
                         {
-                            requestString = $"{requestString}?classstr={request.PolicyClassification}";
-                        }
-                        else
-                        {
-                            requestString = $"{requestString}?classid={request.PolicyClassificationId}";
-                        }
-                        Uri requestUri = new Uri(requestString);
-                        using (HttpClient getClient = _httpClientFactory.CreateClient())
-                        {
-                            if (request.TimeoutSpecified)
+                            string requestString = $"{requestUriString}deferred/start/{request.Particle}";
+                            if (request.PolicyClassification != null && request.PolicyClassification != string.Empty)
                             {
-                                getClient.Timeout = request.RequestTimeout;
+                                requestString = $"{requestString}?classstr={request.PolicyClassification}";
                             }
-                            bool makeRequest = true;
-                            int requestCount = 0;
-                            while (makeRequest)
+                            else
                             {
-                                if (_settings.JWT != string.Empty)
+                                requestString = $"{requestString}?classid={request.PolicyClassificationId}";
+                            }
+                            Uri requestUri = new Uri(requestString);
+                            using (HttpClient deferredPutClient = _httpClientFactory.CreateClient($"DeferredPOSTClient"))
+                            {
+                                if (request.TimeoutSpecified)
                                 {
-                                    getClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.JWT);
+                                    deferredPutClient.Timeout = request.RequestTimeout;
                                 }
+                                bool makeRequest = true;
+                                int requestCount = 0;
+                                while (makeRequest)
+                                {
+                                    if (_settings.JWT != string.Empty)
+                                    {
+                                        deferredPutClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _settings.JWT);
+                                    }
+                                    // Postman default headers
+                                    //deferredPutClient.DefaultRequestHeaders.Add("Accept", "*/*");
+                                    //deferredPutClient.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate, br");
+                                    //deferredPutClient.DefaultRequestHeaders.Add("Connection", "keep-alive");
+                                    //deferredPutClient.DefaultRequestHeaders.Add("Cache-Control", "no-cache");
+                                    if (request.DataStream.Position != request.StreamPosition)
+                                    {
+                                        request.DataStream.Seek(request.StreamPosition, SeekOrigin.Begin);
+                                    }
 
-                                makeRequest = false;
-                                HttpResponseMessage putResponse = await getClient.PostAsync(requestUri, sendData);
-                                requestCount++;
-                                if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
-                                {
-                                    // Success
-                                    response.Status = 200;
-                                    string tokenResponse = await putResponse.Content.ReadAsStringAsync();
-                                    try
+                                    ByteArrayContent sendData = await MakeByteArrayContent(request.DataStream);
+                                    if (sendData != null)
                                     {
-                                        DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
-                                        response.DeferredToken = tokenObject.DeferredToken.ToString();
-                                    }
-                                    catch (Exception)
-                                    {
-                                        // Probably old api giving plain text response
-                                        response.DeferredToken = tokenResponse;
-                                    }
-                                }
-                                else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                                {
-                                    // Possible that JWT has expired
-                                    if (_settings.JWTAssigned)
-                                    {
-                                        // Had one before so refresh and try again. Once.
-                                        if (requestCount < 2)
+                                        sendData.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+
+                                        makeRequest = false;
+                                        try
                                         {
-                                            RefreshJWT();
-                                            makeRequest = true;
+                                            HttpResponseMessage putResponse = await deferredPutClient.PostAsync(requestUri, sendData);
+                                            requestCount++;
+                                            response.Status = Convert.ToInt32(putResponse.StatusCode);
+                                            if (putResponse.StatusCode == System.Net.HttpStatusCode.OK)
+                                            {
+                                                // Success
+                                                response.Status = 200;
+                                                string tokenResponse = await putResponse.Content.ReadAsStringAsync();
+                                                try
+                                                {
+                                                    DeferredResult tokenObject = JsonConvert.DeserializeObject<DeferredResult>(tokenResponse);
+                                                    response.DeferredToken = tokenObject.DeferredToken.ToString();
+                                                }
+                                                catch (Exception)
+                                                {
+                                                    // Probably old api giving plain text response
+                                                    response.DeferredToken = tokenResponse;
+                                                }
+                                            }
+                                            else if (putResponse.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                                            {
+                                                // Possible that JWT has expired
+                                                if (_settings.JWTAssigned)
+                                                {
+                                                    // Had one before so refresh and try again. Once.
+                                                    if (requestCount < 2)
+                                                    {
+                                                        RefreshJWT();
+                                                        makeRequest = true;
+                                                    }
+                                                    else
+                                                    {
+                                                        response.Status = Convert.ToInt32(putResponse.StatusCode);
+                                                    }
+                                                }
+                                            }
+                                            else
+                                            {
+                                                if (response.Status == 429)
+                                                {
+                                                    // Rate limiter has stepped in
+                                                    response.Message = "Request has been rate limited";
+                                                }
+                                                if (response.Status == 413)
+                                                {
+                                                    // Body too large
+                                                    response.Message = "Request body is too large";
+                                                }
+                                            }
                                         }
-                                        else
+                                        catch (HttpRequestException e)
                                         {
-                                            response.Status = (int)putResponse.StatusCode;
+                                            response.Status = 500;
+                                            response.Message = $"HTTP request exception: {e.Message}";
                                         }
+                                        catch (WebException e)
+                                        {
+                                            response.Status = 500;
+                                            response.Message = $"Web exception calling POST: {e.Message}";
+                                        }
+                                        catch (Exception e)
+                                        {
+                                            response.Status = 99;
+                                            response.Message = $"Exception making calling POST or handling response: {e.Message}";
+                                        }
+
+                                        sendData.Dispose();
                                     }
-                                }
-                                else
-                                {
-                                    // Not Ok
-                                    response.Status = (int)putResponse.StatusCode;
+                                    else
+                                    {
+                                        response.Status = 99;
+                                        response.Message = "Failed to create HttpContent for request";
+                                    }
                                 }
                             }
                         }
-                        sendData.Dispose();
                     }
                 }
-            }
-            catch (WebException)
-            {
-            }
-            catch (Exception)
-            {
+                catch (WebException e)
+                {
+                    Console.WriteLine($"InitiateDeferredPut: {e.Message}");
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"InitiateDeferredPut: {e.Message}");
+                }
             }
 
-            return response;
+            if (response.Status == 0)
+            {
+                Console.WriteLine("Something wrong");
+            }
+
+            return await Task.FromResult(response);
+        }
+
+        private async Task<DeleteManifestResult> ProcessDeleteManifestRequest(DeleteManifestRequest request)
+        {
+
+            using ManifestWorker manifestWorker = new ManifestWorker(this, _settings, _server, _dataPath, _secretsPath);
+            return await manifestWorker.ProcessDeleteManifestRequest(request);
+        }
+
+        private async Task<GetManifestResult> ProcessGetManifestRequest(GetManifestRequest request)
+        {
+            using ManifestWorker manifestWorker = new ManifestWorker(this, _settings, _server, _dataPath, _secretsPath);
+            return await manifestWorker.ProcessGetManifestRequest(request);
+        }
+
+        private async Task<PutManifestResult> ProcessPutManifestRequest(PutManifestRequest request)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+            if (request.ChunkSize == 0)
+            {
+                // Throw in the default
+                if (_settings.DefaultChunkSize != 0)
+                {
+                    request.ChunkSize = _settings.DefaultChunkSize;
+                }
+                else
+                {
+                    request.ChunkSize = await GetUploadSizeLimit($"{_server}{_dataPath}query/uploadsizelimit");
+                }
+            }
+            using ManifestWorker manifestWorker = new ManifestWorker(this, _settings, _server, _dataPath, _secretsPath);
+            return await manifestWorker.ProcessPutManifestRequest(request);
+        }
+
+        private async Task<StreamContent> MakeStreamContent(Stream content)
+        {
+            try
+            {
+                return await Task.FromResult(new StreamContent(content));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private async Task<ByteArrayContent> MakeByteArrayContent(Stream content)
+        {
+            try
+            {
+                using (MemoryStream ms = new MemoryStream())
+                {
+                    await content.CopyToAsync(ms, 524288);
+                    return await Task.FromResult(new ByteArrayContent(ms.ToArray()));
+                }
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private async Task<GetPolicyClassificationResult> ProcessClassificationRequest(GetPolicyClassificationRequest request)
@@ -938,7 +1307,7 @@ namespace Ionburst.SDK
                 {
                     requestUriString = $"{requestUriString}?displaytag=both";
                     Uri requestUri = new Uri(requestUriString);
-                    using (HttpClient httpClient = _httpClientFactory.CreateClient())
+                    using (HttpClient httpClient = _httpClientFactory.CreateClient("ClassificationClient"))
                     {
                         if (_settings.JWT != string.Empty)
                         {
@@ -990,12 +1359,26 @@ namespace Ionburst.SDK
                             if (result.StatusCode == 429)
                             {
                                 // Rate limiter has steppeed in
-                                result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                try
+                                {
+                                    result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                }
+                                catch
+                                {
+                                    result.StatusMessage = "Request has been rate limited";
+                                }
                             }
                             else
                             {
                                 // Just put in the result content
-                                result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                try
+                                {
+                                    result.StatusMessage = await getResponse.Content.ReadAsStringAsync();
+                                }
+                                catch
+                                {
+                                    result.StatusMessage = "API response in unexpected format";
+                                }
                             }
                         }
                     }
@@ -1018,7 +1401,7 @@ namespace Ionburst.SDK
                 result.StatusMessage = $"SDK exception: {e.Message}";
             }
 
-            return result;
+            return await Task.FromResult(result);
         }
 
         internal async Task<JwtResponse> GetJWT(JwtRequest request)
@@ -1042,7 +1425,7 @@ namespace Ionburst.SDK
                     };
                     StringContent authorisationBodyString = new StringContent(JsonConvert.SerializeObject(authorisationBody));
                     authorisationBodyString.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-                    using (HttpClient httpClient = _httpClientFactory.CreateClient())
+                    using (HttpClient httpClient = _httpClientFactory.CreateClient("JWTClient"))
                     {
                         HttpResponseMessage jwtResponse = await httpClient.PostAsync(requestUri, authorisationBodyString);
                         response.StatusCode = Convert.ToInt32(jwtResponse.StatusCode);
@@ -1088,7 +1471,7 @@ namespace Ionburst.SDK
                 response.Exception = e;
             }
 
-            return response;
+            return await Task.FromResult(response);
         }
 
         internal void RefreshJWT()
@@ -1120,7 +1503,7 @@ namespace Ionburst.SDK
             try
             {
                 Uri requestUri = new Uri(request);
-                using (HttpClient httpClient = _httpClientFactory.CreateClient())
+                using (HttpClient httpClient = _httpClientFactory.CreateClient("SizeClient"))
                 {
                     HttpResponseMessage sizeResponse = await httpClient.GetAsync(requestUri);
                     if (sizeResponse.StatusCode == System.Net.HttpStatusCode.OK)
@@ -1136,7 +1519,7 @@ namespace Ionburst.SDK
             {
             }
 
-            return limit;
+            return await Task.FromResult(limit);
         }
 
         internal async Task<bool> CheckApi(string request)
@@ -1146,7 +1529,7 @@ namespace Ionburst.SDK
             try
             {
                 Uri requestUri = new Uri(request);
-                using (HttpClient httpClient = _httpClientFactory.CreateClient())
+                using (HttpClient httpClient = _httpClientFactory.CreateClient("APICheckClient"))
                 {
                     HttpResponseMessage versionResponse = await httpClient.GetAsync(requestUri);
                     if (versionResponse.StatusCode == System.Net.HttpStatusCode.OK)
@@ -1162,7 +1545,7 @@ namespace Ionburst.SDK
             {
             }
 
-            return apiResponds;
+            return await Task.FromResult(apiResponds);
         }
         internal async Task<string> GetAPIVersion(string request)
         {
@@ -1171,7 +1554,7 @@ namespace Ionburst.SDK
             try
             {
                 Uri requestUri = new Uri(request);
-                using (HttpClient httpClient = _httpClientFactory.CreateClient())
+                using (HttpClient httpClient = _httpClientFactory.CreateClient("VersionClient"))
                 {
                     HttpResponseMessage versionResponse = await httpClient.GetAsync(requestUri);
                     if (versionResponse.StatusCode == System.Net.HttpStatusCode.OK)
@@ -1199,7 +1582,7 @@ namespace Ionburst.SDK
                 version = $"Excrption: {e.Message}";
             }
 
-            return version;
+            return await Task.FromResult(version);
         }
 
         internal void SimulateBadToken()

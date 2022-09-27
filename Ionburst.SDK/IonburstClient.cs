@@ -7,6 +7,7 @@ using System.IO;
 
 using Microsoft.Extensions.Configuration;
 
+using Ionburst.SDK.Contracts;
 using Ionburst.SDK.Model;
 
 namespace Ionburst.SDK
@@ -15,22 +16,24 @@ namespace Ionburst.SDK
     {
         public IonburstClient()
         {
-            _settings = new IonburstSDKSettings();
-            CreateIonburstClient(_settings.IonburstUri);
+            _settings = new IonburstSDKSettings(true);
         }
 
+        [Obsolete("Use client builder")]
         public IonburstClient(string serverUri)
         {
             _settings = new IonburstSDKSettings();
             CreateIonburstClient(serverUri);
         }
 
+        [Obsolete("Use client builder")]
         public IonburstClient(IConfiguration externalConfiguration)
         {
             _settings = new IonburstSDKSettings(externalConfiguration);
             CreateIonburstClient(_settings.IonburstUri);
         }
 
+        [Obsolete("Use client builder")]
         public IonburstClient(IConfiguration externalConfiguration, string serverUri)
         {
             _settings = new IonburstSDKSettings(externalConfiguration);
@@ -44,15 +47,54 @@ namespace Ionburst.SDK
             }
         }
 
-        [Obsolete("Use CreateIonburstClient")]
-        public void CreateIonBurstClient(string serverUri)
+        public void CreateIonburstClient(string serverUri)
         {
             InternalCreateIonburstClient(serverUri);
         }
 
-        public void CreateIonburstClient(string serverUri)
+        public IonburstClient WithIonburstUri(string uri)
         {
-            InternalCreateIonburstClient(serverUri);
+            this._settings.IonburstUri = uri;
+            return this;
+        }
+
+        public IonburstClient WithExternalConfiguration(IConfiguration externalConfiguration)
+        {
+            this._settings.ExternalConfiguration = externalConfiguration;
+            return this;
+        }
+
+        public IonburstClient WithIonburstId(string user)
+        {
+            this._settings.IonburstId = user;
+            return this;
+        }
+
+        public IonburstClient WithIonburstKey(string key)
+        {
+            this._settings.IonburstKey = key;
+            return this;
+        }
+
+        public IonburstClient WithCredential(IonburstCredential credential)
+        {
+            this._settings.IonburstId = credential.IonburstId;
+            this._settings.IonburstKey = credential.IonburstKey;
+            return this;
+        }
+
+        public IonburstClient WithProfile(string profile)
+        {
+            this._settings.IonburstProfile = profile;
+            return this;
+        }
+
+        public IIonburstClient Build()
+        {
+            this._settings.BuildConfiguationFromBuilder();
+            this._settings.BuildIonburstSDKSettings();
+            InternalCreateIonburstClient(_settings.IonburstUri);
+            return this;
         }
 
         // Contoller specific request body limits
@@ -67,6 +109,90 @@ namespace Ionburst.SDK
             return await _apiHandler.GetUploadSizeLimit($"{_serverUri}{_uriSecretsPath}query/uploadsizelimit");
         }
 
+        // Check object
+        public CheckObjectResult Check(CheckObjectRequest request)
+        {
+            request.CheckValues(_serverUri, _uriDataPath);
+            return InternalCheck(request).Result;
+        }
+
+        public CheckObjectResult SecretsCheck(CheckObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return InternalCheck(request).Result;
+        }
+
+        public async Task<CheckObjectResult> CheckAsync(CheckObjectRequest request)
+        {
+            request.CheckValues(_serverUri, _uriDataPath);
+            return await InternalCheck(request);
+        }
+
+        public async Task<CheckObjectResult> SecretsCheckAsync(CheckObjectRequest request)
+        {
+            request.Routing = string.Empty;
+            request.CheckValues(_serverUri, _uriSecretsPath);
+            return await InternalCheck(request);
+        }
+
+        public bool CheckWithCallback(CheckObjectRequest request)
+        {
+            bool functionResult = false;
+            if (request.RequestResult != null)
+            {
+                try
+                {
+                    DelegateCheck(request);
+                    functionResult = true;
+                }
+                catch (Exception)
+                {
+                    // Swallow
+                }
+            }
+
+            return functionResult;
+        }
+
+        public bool SecretsCheckWithCallback(CheckObjectRequest request)
+        {
+            bool functionResult = false;
+            if (request.RequestResult != null)
+            {
+                try
+                {
+                    SecretsDelegateCheck(request);
+                    functionResult = true;
+                }
+                catch (Exception)
+                {
+                    // Swallow
+                }
+            }
+
+            return functionResult;
+        }
+
+        private async Task<CheckObjectResult> InternalCheck(CheckObjectRequest request)
+        {
+            return await _apiHandler.ProcessRequest(request) as CheckObjectResult;
+        }
+
+        private async void DelegateCheck(CheckObjectRequest request)
+        {
+            CheckObjectResult result = await CheckAsync(request);
+            result.DelegateTag = request.DelegateTag;
+            request.RequestResult?.Invoke(result);
+        }
+
+        private async void SecretsDelegateCheck(CheckObjectRequest request)
+        {
+            CheckObjectResult result = await SecretsCheckAsync(request);
+            result.DelegateTag = request.DelegateTag;
+            request.RequestResult?.Invoke(result);
+        }
+
         // Delete object
 
         public DeleteObjectResult Delete(DeleteObjectRequest request)
@@ -77,6 +203,16 @@ namespace Ionburst.SDK
 
         public DeleteObjectResult SecretsDelete(DeleteObjectRequest request)
         {
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                DeleteManifestResult result = new DeleteManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "DeleteManifestRequest object is not accepted by SecretsDelete"
+                };
+                return result;
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return InternalDelete(request).Result;
@@ -90,6 +226,16 @@ namespace Ionburst.SDK
 
         public async Task<DeleteObjectResult> SecretsDeleteAsync(DeleteObjectRequest request)
         {
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                DeleteManifestResult result = new DeleteManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "DeleteManifestRequest object is not accepted by SecretsDelete"
+                };
+                return await Task.FromResult(result);
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return await InternalDelete(request);
@@ -116,6 +262,11 @@ namespace Ionburst.SDK
 
         public bool SecretsDeleteWithCallback(DeleteObjectRequest request)
         {
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                return false;
+            }
             bool functionResult = false;
             if (request.RequestResult != null)
             {
@@ -133,9 +284,9 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
-        private async ValueTask<DeleteObjectResult> InternalDelete(DeleteObjectRequest request)
+        private async Task<DeleteObjectResult> InternalDelete(DeleteObjectRequest request)
         {
-            return (DeleteObjectResult)await _apiHandler.ProcessRequest(request);
+            return await _apiHandler.ProcessRequest(request) as DeleteObjectResult;
         }
 
         private async void DelegateDelete(DeleteObjectRequest request)
@@ -147,9 +298,23 @@ namespace Ionburst.SDK
 
         private async void SecretsDelegateDelete(DeleteObjectRequest request)
         {
-            DeleteObjectResult result = await SecretsDeleteAsync(request);
-            result.DelegateTag = request.DelegateTag;
-            request.RequestResult?.Invoke(result);
+            if (request is DeleteManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                DeleteManifestResult rejectResult = new DeleteManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "DeleteManifestRequest object is not accepted by SecretsDelegateDelete",
+                    DelegateTag = request.DelegateTag
+                };
+                request.RequestResult?.Invoke(rejectResult);
+            }
+            else
+            {
+                DeleteObjectResult result = await SecretsDeleteAsync(request);
+                result.DelegateTag = request.DelegateTag;
+                request.RequestResult?.Invoke(result);
+            }
         }
 
         // Get object
@@ -162,6 +327,16 @@ namespace Ionburst.SDK
 
         public GetObjectResult SecretsGet(GetObjectRequest request)
         {
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                GetManifestResult result = new GetManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "GetManifestRequest object is not accepted by SecretsGet"
+                };
+                return result;
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return InternalGet(request).Result;
@@ -176,6 +351,16 @@ namespace Ionburst.SDK
 
         public async Task<GetObjectResult> SecretsGetAsync(GetObjectRequest request)
         {
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                GetManifestResult result = new GetManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "GetManifestRequest object is not accepted by SecretsGetAsync"
+                };
+                return await Task.FromResult(result);
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             request.CheckTrailingCharacters();
@@ -203,6 +388,11 @@ namespace Ionburst.SDK
 
         public bool SecretsGetWithCallback(GetObjectRequest request)
         {
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                return false;
+            }
             bool functionResult = false;
             if (request.RequestResult != null)
             {
@@ -220,9 +410,9 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
-        private async ValueTask<GetObjectResult> InternalGet(GetObjectRequest request)
+        private async Task<GetObjectResult> InternalGet(GetObjectRequest request)
         {
-            return (GetObjectResult)await _apiHandler.ProcessRequest(request);
+            return await _apiHandler.ProcessRequest(request) as GetObjectResult;
         }
 
         private async void DelegateGet(GetObjectRequest request)
@@ -234,9 +424,23 @@ namespace Ionburst.SDK
 
         private async void SecretsDelegateGet(GetObjectRequest request)
         {
-            GetObjectResult result = await SecretsGetAsync(request);
-            result.DelegateTag = request.DelegateTag;
-            request.RequestResult?.Invoke(result);
+            if (request is GetManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                GetManifestResult rejectResult = new GetManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "GetManifestRequest object is not accepted by SecretsGetAsync",
+                    DelegateTag = request.DelegateTag
+                };
+                request.RequestResult?.Invoke(rejectResult);
+            }
+            else
+            {
+                GetObjectResult result = await SecretsGetAsync(request);
+                result.DelegateTag = request.DelegateTag;
+                request.RequestResult?.Invoke(result);
+            }
         }
 
         // Put object
@@ -249,6 +453,16 @@ namespace Ionburst.SDK
 
         public PutObjectResult SecretsPut(PutObjectRequest request)
         {
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                PutManifestResult result = new PutManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "PutManifestRequest object is not accepted by SecretsPut"
+                };
+                return result;
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return InternalPut(request).Result;
@@ -262,6 +476,16 @@ namespace Ionburst.SDK
 
         public async Task<PutObjectResult> SecretsPutAsync(PutObjectRequest request)
         {
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                PutManifestResult result = new PutManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "PutManifestRequest object is not accepted by SecretsPutAsync"
+                };
+                return await Task.FromResult(result);
+            }
             request.Routing = string.Empty;
             request.CheckValues(_serverUri, _uriSecretsPath);
             return await InternalPut(request);
@@ -288,6 +512,11 @@ namespace Ionburst.SDK
 
         public bool SecretsPutWithCallback(PutObjectRequest request)
         {
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                return false;
+            }
             bool functionResult = false;
             if (request.RequestResult != null)
             {
@@ -305,9 +534,9 @@ namespace Ionburst.SDK
             return functionResult;
         }
 
-        private async ValueTask<PutObjectResult> InternalPut(PutObjectRequest request)
+        private async Task<PutObjectResult> InternalPut(PutObjectRequest request)
         {
-            return (PutObjectResult)await _apiHandler.ProcessRequest(request);
+            return await _apiHandler.ProcessRequest(request) as PutObjectResult;
         }
 
         private async void DelegatePut(PutObjectRequest request)
@@ -319,9 +548,23 @@ namespace Ionburst.SDK
 
         private async void SecretsDelegatePut(PutObjectRequest request)
         {
-            PutObjectResult result = await SecretsPutAsync(request);
-            result.DelegateTag = request.DelegateTag;
-            request.RequestResult?.Invoke(result);
+            if (request is PutManifestRequest)
+            {
+                // Not allowed with Secrets controller
+                PutManifestResult rejectResult = new PutManifestResult()
+                {
+                    StatusCode = 400,
+                    StatusMessage = "PutManifestRequest object is not accepted by SecretsDelegatePut",
+                    DelegateTag = request.DelegateTag
+                };
+                request.RequestResult?.Invoke(rejectResult);
+            }
+            else
+            {
+                PutObjectResult result = await SecretsPutAsync(request);
+                result.DelegateTag = request.DelegateTag;
+                request.RequestResult?.Invoke(result);
+            }
         }
 
         public PutObjectResult RePut(PutObjectRequest request)
@@ -338,12 +581,14 @@ namespace Ionburst.SDK
                 Particle = request.Particle
             };
             getRequest.CheckValues(_serverUri, _uriDataPath);
-            GetObjectResult getResult = (GetObjectResult)await _apiHandler.ProcessRequest(getRequest);
+            GetObjectResult getResult = await _apiHandler.ProcessRequest(getRequest) as GetObjectResult;
             if (getResult.StatusCode == 200)
             {
                 getResult.DataStream.Seek(0, SeekOrigin.Begin);
-                request.DataStream = new MemoryStream();
-                await getResult.DataStream.CopyToAsync(request.DataStream);
+                MemoryStream ms = new MemoryStream();
+                await getResult.DataStream.CopyToAsync(ms, 524288);
+                ms.Seek(0, SeekOrigin.Begin);
+                request.DataStream = ms;
 
                 // Need to delete it before the re-put. Risky
                 DeleteObjectRequest deleteRequest = new DeleteObjectRequest
@@ -351,10 +596,10 @@ namespace Ionburst.SDK
                     Particle = request.Particle
                 };
                 deleteRequest.CheckValues(_serverUri, _uriDataPath);
-                DeleteObjectResult deleteResult = (DeleteObjectResult)await _apiHandler.ProcessRequest(deleteRequest);
+                DeleteObjectResult deleteResult = await _apiHandler.ProcessRequest(deleteRequest) as DeleteObjectResult;
                 if (deleteResult.StatusCode == 200)
                 {
-                    return (PutObjectResult)await _apiHandler.ProcessRequest(request);
+                    return await _apiHandler.ProcessRequest(request) as PutObjectResult;
                 }
                 else
                 {
@@ -396,7 +641,20 @@ namespace Ionburst.SDK
 
         private async Task<DeferredActionResult> InternalStartDeferredActionAsync(ObjectRequest request)
         {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
             DeferredActionResult result = new DeferredActionResult();
+
+            if (request is DeleteManifestRequest || request is GetManifestRequest || request is PutManifestRequest)
+            {
+                // No deferred actions with manifests
+                result.StatusCode = 400;
+                result.StatusMessage = "Manifest requests are not permitted with deferred requests";
+                return await Task.FromResult(result);
+            }
 
             request.PhasedMode = true;
             if (request is GetObjectRequest getRequest)
@@ -453,25 +711,25 @@ namespace Ionburst.SDK
                             result.StatusMessage = e.Message;
                         }
                     }
-                    else
+                }
+                else
+                {
+                    result.StatusCode = deferredResponse.Status;
+                    if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
                     {
-                        result.StatusCode = deferredResponse.Status;
-                        if (result.StatusCode == 401 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Not authorized to upload data";
-                        }
-                        if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Upload rejected because quota is exceeded";
-                        }
-                        if (result.StatusCode == 413 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Data is too large to upload";
-                        }
-                        if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
-                        {
-                            result.StatusMessage = "Web server throttling has prevented the upload";
-                        }
+                        result.StatusMessage = "Not authorized to upload data";
+                    }
+                    if (result.StatusCode == 403 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Upload rejected because quota is exceeded";
+                    }
+                    if (result.StatusCode == 413 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Data is too large to upload";
+                    }
+                    if (result.StatusCode == 429 && result.StatusMessage == string.Empty)
+                    {
+                        result.StatusMessage = "Web server throttling has prevented the upload";
                     }
                 }
             }
@@ -497,7 +755,7 @@ namespace Ionburst.SDK
             return await InternalCheckDeferredActionAsync(request);
         }
 
-        private async ValueTask<DeferredCheckResult> InternalCheckDeferredActionAsync(ObjectRequest request)
+        private async Task<DeferredCheckResult> InternalCheckDeferredActionAsync(ObjectRequest request)
         {
             return await _apiHandler.DeferredRequestCheck(request);
         }

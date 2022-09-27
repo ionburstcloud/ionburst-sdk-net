@@ -1,5 +1,5 @@
 ﻿// Copyright Ionburst Limited 2021
-namespace Ionburst.SDK
+namespace Ionburst.SDK.Contracts
 {
     internal class DeferredResponse
     {

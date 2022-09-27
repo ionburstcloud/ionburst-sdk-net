@@ -2,6 +2,97 @@
 
 <!--- next entry here -->
 
+## 1.3.0-develop.12
+2022-07-12
+
+### Fixes
+
+- added extension to add IonburstClient to .NET DI framework (8d9a5a795fb2673d0162fa230735c6a3bc60f567)
+
+## 1.3.0-develop.11
+2022-07-11
+
+### Fixes
+
+- added stream repositioning to put manifest function (d1523bc3e79b69d34f1fd4a6ead86d1b42276e78)
+
+## 1.3.0-develop.10
+2022-07-08
+
+### Fixes
+
+- forget to set MaxSize attribute in manifest class (948202ee7fedfa78e6f06440756941a14c60e078)
+
+## 1.3.0-develop.9
+2022-07-07
+
+### Fixes
+
+- option to record put manifest and speculative stream changes (457e2b2ed4f77fd9a66eeaa40a9b6af076890764)
+- trying a larger size with steam copy calls (5976590d4b96cc8c5049e4cc929a869a8f2b00e9)
+- forgot to calculate hash of original object (8acbd28c41cc4ded3c441c52f597ffed130ee51e)
+
+## 1.3.0-develop.8
+2022-07-07
+
+### Fixes
+
+- option to record put manifest and speculative stream changes (457e2b2ed4f77fd9a66eeaa40a9b6af076890764)
+- trying a larger size with steam copy calls (5976590d4b96cc8c5049e4cc929a869a8f2b00e9)
+
+## 1.3.0-develop.7
+2022-07-07
+
+### Fixes
+
+- option to record put manifest and speculative stream changes (457e2b2ed4f77fd9a66eeaa40a9b6af076890764)
+
+## 1.3.0-develop.6
+2022-07-06
+
+### Fixes
+
+- speculative stream handling improvements (9db8992f7468472b0bf08e32e0b81477027e11cf)
+
+## 1.3.0-develop.5
+2022-07-06
+
+### Fixes
+
+- fixes from using SDK in client application (622853528d0d025f09eca49dafb44b9469409673)
+
+## 1.3.0-develop.4
+2022-07-04
+
+### Features
+
+- added option to handle large files by manifest (18e2271dbc694ec69b75900e871b4a977cfdba7e)
+
+## 1.3.0-develop.3
+2022-05-12
+
+### Fixes
+
+- set correct uri path for Secrets check methods (2352aff9d8148513c5a9bc827756b790e8669fbf)
+
+## 1.3.0-develop.2
+2022-05-12
+
+### Features
+
+- Added CheckObject methods to call API HEAD methods (88eeab07584f056d6d3f37023f9a0bbf1a933af5)
+
+### Fixes
+
+- corrected builder function names to be in line with credentials file attributes (54a7f8c3fb238e3c03beba80a0add6dce4a96b70)
+
+## 1.3.0-develop.1
+2022-03-21
+
+### Features
+
+- option for client to provide credentials to SDK plus some re-structuring (9b9b57dc8a4f58595fd6e825327d8bf9ad5e3fbb)
+
 ## 1.2.6
 2022-03-07
 

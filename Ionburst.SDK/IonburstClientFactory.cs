@@ -1,6 +1,7 @@
 ﻿// Copyright Ionburst Limited 2019
 using Microsoft.Extensions.Configuration;
-using System;
+
+using Ionburst.SDK.Model;
 
 namespace Ionburst.SDK
 {
@@ -8,35 +9,66 @@ namespace Ionburst.SDK
     {
         public static IIonburstClient CreateIonburstClient(string serverUri = "")
         {
-            return new IonburstClient(serverUri);
-        }
+            if (string.IsNullOrEmpty(serverUri))
+            {
+                return new IonburstClient().Build();
+            }
 
-        [Obsolete("Use CreateIonburstClient")]
-        public static IIonburstClient CreateIonBurstClient(string serverUri = "")
-        {
-            return new IonburstClient(serverUri);
+            return new IonburstClient()
+                .WithIonburstUri(serverUri)
+                .Build();
         }
 
         public static IIonburstClient CreateIonburstClient(IConfiguration externalConfiguration, string serverUri = "")
         {
-            return new IonburstClient(externalConfiguration, serverUri);
+            if (string.IsNullOrEmpty(serverUri))
+            {
+                return new IonburstClient()
+                    .WithExternalConfiguration(externalConfiguration)
+                    .Build();
+            }
+
+            return new IonburstClient()
+                .WithIonburstUri(serverUri)
+                .WithExternalConfiguration(externalConfiguration)
+                .Build();
         }
 
-        [Obsolete("Use CreateIonburstClient")]
-        public static IIonburstClient CreateIonBurstClient(IConfiguration externalConfiguration, string serverUri = "")
+        public static IIonburstClient CreateIonburstClient(IonburstCredential credential, string serverUri = "")
         {
-            return new IonburstClient(externalConfiguration, serverUri);
+            if (string.IsNullOrEmpty(serverUri))
+            {
+                return new IonburstClient()
+                    .WithCredential(credential)
+                    .Build();
+            }
+
+            return new IonburstClient()
+                .WithIonburstUri(serverUri)
+                .WithCredential(credential)
+                .Build();
+        }
+
+        public static IIonburstClient CreateIonburstClient(IConfiguration externalConfiguration, IonburstCredential credential, string serverUri = "")
+        {
+            if (string.IsNullOrEmpty(serverUri))
+            {
+                return new IonburstClient()
+                    .WithExternalConfiguration(externalConfiguration)
+                    .WithCredential(credential)
+                    .Build();
+            }
+
+            return new IonburstClient()
+                .WithIonburstUri(serverUri)
+                .WithExternalConfiguration(externalConfiguration)
+                .WithCredential(credential)
+                .Build();
         }
 
         public static IIonburstClient CreateIonburstClient()
         {
-            return new IonburstClient();
-        }
-
-        [Obsolete("Use CreateIonburstClient")]
-        public static IIonburstClient CreateIonBurstClient()
-        {
-            return new IonburstClient();
+            return new IonburstClient().Build();
         }
     }
 }

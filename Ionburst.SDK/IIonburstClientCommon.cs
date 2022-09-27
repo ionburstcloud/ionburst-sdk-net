@@ -17,9 +17,6 @@ namespace Ionburst.SDK
 
         Task<string> GetConfiguredUri();
 
-        [Obsolete("Use CheckIonburstAPI")]
-        Task<bool> CheckIonBurstAPI();
-
         Task<bool> CheckIonburstAPI();
 
         Task<List<string>> GetVersionDetails();
